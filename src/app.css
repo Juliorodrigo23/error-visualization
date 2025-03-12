@@ -256,3 +256,31 @@ input[type="number"] {
     width: 95%;
   }
 }
+
+.gradient-text {
+  background: linear-gradient(90deg, #4d6afb 0%, #fb64f1 50%, #FFCC70 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: bold;
+  padding: 0 5px;
+}
+
+/* Optional: add animation to make it more dynamic */
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Apply animation on hover */
+.gradient-text:hover {
+  background-size: 200% auto;
+  animation: gradient-shift 3s ease infinite;
+}

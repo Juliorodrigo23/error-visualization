@@ -324,12 +324,12 @@
 
   <div bind:this={plotDiv} class="plot-container"></div>
 
-  <h2>Current Visible Overlap Area: {overlapArea.toFixed(4)}</h2>
+  <h2>Current Visible Overlap Area:  <span class="gradient-text"> {overlapArea.toFixed(4)} </span></h2>
   
   <div class="instructions">
     <p><strong>Trackpad Navigation:</strong></p>
     <ul>
-      <li>Zoom: Ctrl/Cmd + Scroll OR Zoom Motion (centered on mouse position)</li>
+      <li>Zoom: Ctrl/Cmd + Scroll OR Zoom Motion (centered on mouse)</li>
       <li>Pan: Scroll left/right</li>
       <li>Adjust sliders: Hover over a slider and scroll/swipe</li>
     </ul>
