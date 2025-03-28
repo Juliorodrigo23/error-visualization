@@ -14,6 +14,9 @@
   let errorProbability = 0; // Pe - bit flip probability
   let erasureProbability = 0; // Pc - erasure probability
   let showNegativeTauErasure = false;
+  let blueOverlapComponent = 0; // For tracking signal -1 component (blue fill)
+  let redOverlapComponent = 0;  // For tracking signal 1 component (red fill)
+
   
   let xStart = -5; // Initial x-axis range
   let xEnd = 5;
@@ -64,8 +67,9 @@
       
       // For baseline mode, we only want to color where both curves exist
       // and use the color of the curve that's directly above
-      f1DirectValues.push(overlap && f2IsAbove ? Math.min(f1, f2) : 0); // Blue where f2 is above
-      f2DirectValues.push(overlap && f1IsAbove ? Math.min(f1, f2) : 0); // Red where f1 is above
+      f1DirectValues.push(overlap && f2 > f1 ? minVal : overlap && f2 === f1 ? minVal / 2 : 0);
+      f2DirectValues.push(overlap && f1 > f2 ? minVal : overlap && f2 === f1 ? minVal / 2 : 0);
+
       
       // For visualization modes with thresholds
       leftOfThresholdValues.push(x <= threshold ? minVal : 0);
@@ -139,6 +143,38 @@
       totalOverlap += (minValues[i] + minValues[i + 1]) * step / 2;
     }
     
+    let redComponent = 0;
+    let blueComponent = 0;
+
+    for (let i = 0; i < xValues.length - 1; i++) {
+      const dx = xValues[i + 1] - xValues[i];
+
+      const f1 = f1Values[i];
+      const f2 = f2Values[i];
+      const f1Next = f1Values[i + 1];
+      const f2Next = f2Values[i + 1];
+
+      const minCurr = Math.min(f1, f2);
+      const minNext = Math.min(f1Next, f2Next);
+      const avgOverlap = (minCurr + minNext) * dx / 2;
+
+      const f1AboveCount = Number(f1 > f2) + Number(f1Next > f2Next);
+      const f2AboveCount = Number(f2 > f1) + Number(f2Next > f1Next);
+
+      if (f1AboveCount > f2AboveCount) {
+        redComponent += avgOverlap;
+      } else if (f2AboveCount > f1AboveCount) {
+        blueComponent += avgOverlap;
+      } else {
+        redComponent += avgOverlap / 2;
+        blueComponent += avgOverlap / 2;
+      }
+    }
+
+
+    blueOverlapComponent = blueComponent;
+    redOverlapComponent = redComponent;
+
     // Calculate error regions (bit flips)
     let f1Error = 0; // Area under f1 in error region
     let f2Error = 0; // Area under f2 in error region
@@ -152,8 +188,18 @@
       f2Error += (f2ErrorValues[i] + f2ErrorValues[i+1]) * dx / 2;
     }
     
+    let f1Erasure = 0;
+    let f2Erasure = 0;
+    for (let i = 0; i < xValues.length - 1; i++) {
+      const dx = xValues[i+1] - xValues[i];
+      f1Erasure += (f1ErasureValues[i] + f1ErasureValues[i+1]) * dx / 2;
+      f2Erasure += (f2ErasureValues[i] + f2ErasureValues[i+1]) * dx / 2;
+    }
+
     // Calculate erasure regions
-    let erasureProbSum = 0;
+    let visibleOverlap = totalOverlap;
+    let erasureProbSum = f1Erasure + f2Erasure;
+   
     for (let i = 0; i < xValues.length - 1; i++) {
       const dx = xValues[i+1] - xValues[i];
       
@@ -169,7 +215,7 @@
     }
     
     // Set probabilities
-    errorProbability = f1Error + f2Error;
+    errorProbability = visibleOverlap - erasureProbSum;
     erasureProbability = erasureProbSum;
     
     // Set overlap area based on selected mode
@@ -180,13 +226,13 @@
       for (let i = 0; i < leftOfThresholdValues.length - 1; i++) {
         leftOverlap += (leftOfThresholdValues[i] + leftOfThresholdValues[i + 1]) * step / 2;
       }
-      overlapArea = leftOverlap;
+      overlapArea = totalOverlap;
     } else if (overlapMode === "right") {
       let rightOverlap = 0;
       for (let i = 0; i < rightOfThresholdValues.length - 1; i++) {
         rightOverlap += (rightOfThresholdValues[i] + rightOfThresholdValues[i + 1]) * step / 2;
       }
-      overlapArea = rightOverlap;
+      overlapArea = totalOverlap;
     } else {
       // In baseline mode, show the total overlap
       overlapArea = totalOverlap;
@@ -241,7 +287,8 @@
         fillcolor: 'rgba(66, 135, 245, 0.4)',  // Blue for signal -1
         line: { color: 'rgba(0,0,0,0)', width: 0 },  // Invisible line
         name: 'Bit flip (Signal -1 read as 1)',
-        showlegend: true
+        showlegend: true,
+        mode: 'none'
       };
       
       const redOverlapArea = {
@@ -251,7 +298,8 @@
         fillcolor: 'rgba(245, 66, 66, 0.4)',  // Red for signal 1
         line: { color: 'rgba(0,0,0,0)', width: 0 },  // Invisible line
         name: 'Bit flip (Signal 1 read as -1)',
-        showlegend: true
+        showlegend: true,
+        mode: 'none'
       };
       
       // Add traces in order: overlap areas first, then curves on top
@@ -305,7 +353,8 @@
         fillcolor: 'rgba(66, 135, 245, 0.4)',
         line: { color: 'rgba(0,0,0,0)', width: 0 },
         name: `Bit flip (Signal -1 read as 1)`,
-        showlegend: true
+        showlegend: true,
+        mode: 'none'
       };
       
       const redOverlapArea = {
@@ -315,7 +364,8 @@
         fillcolor: 'rgba(245, 66, 66, 0.4)',
         line: { color: 'rgba(0,0,0,0)', width: 0 },
         name: `Bit flip (Signal 1 read as -1)`,
-        showlegend: true
+        showlegend: true,
+        mode: 'none'
       };
       
       // Add the color-coded overlap areas
@@ -661,11 +711,26 @@
     <div bind:this={plotDiv} class="plot-container"></div>
   
     <div class="stats-container">
-      <h2>Current Visible Overlap Area (No Erasures): <span class="gradient-text">{overlapArea.toFixed(4)}</span></h2>
-      
+      <h2>
+        Current Visible Overlap Area (No Erasures): 
+        <span class="gradient-text">{overlapArea.toFixed(4)}</span>
+        {#if overlapMode !== "total"}
+        <div class="component-values">
+          <span class="blue-component">Blue: {blueOverlapComponent.toFixed(2)}</span>
+          <span class="red-component">Red: {redOverlapComponent.toFixed(2)}</span>
+        </div>
+        {/if}
+      </h2>
       <!-- Show error and erasure probabilities for modes with thresholds -->
       {#if overlapMode === "left" || overlapMode === "right"}
-        <h2>Bit Flip Probability (Pe) (Visible Area w/Erasures): <span class="gradient-text error">{errorProbability.toFixed(4)}</span></h2>
+        <h2>
+          Bit Flip Probability (Pe): 
+          <span class="gradient-text error">{errorProbability.toFixed(4)}</span>
+          <div class="component-values">
+            <span class="blue-component">Blue: {blueOverlapComponent.toFixed(2)}</span>
+            <span class="red-component">Red: {redOverlapComponent.toFixed(2)}</span>
+          </div>
+        </h2>
         <h2>Erasure Probability (Pc): <span class="gradient-text erasure">{erasureProbability.toFixed(4)}</span></h2>
       {/if}
     </div>
@@ -677,6 +742,7 @@
         <li>Pan: Scroll left/right</li>
         <li>Adjust sliders: Hover over a slider and scroll/swipe</li>
         <li>Click legend: Toggle components visually without adjusting logic </li>
+        <li>*Blue and red limited to 2 decimals due to performance*</li>
       </ul>
       
       <div class="formula-explanation">

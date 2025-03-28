@@ -266,6 +266,24 @@ input[type="number"] {
   padding: 0 5px;
 }
 
+.blue-component{
+  background: linear-gradient(90deg, #4d6afb 0%, #00f7ff 50%, #6d34ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: bold;
+  padding: 0 5px;
+}
+
+.red-component{
+  background: linear-gradient(90deg, #fb4d4d 0%, #ff4000 50%, #eb0000 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: bold;
+  padding: 0 5px;
+}
+
 /* Optional: add animation to make it more dynamic */
 @keyframes gradient-shift {
   0% {
@@ -284,6 +302,16 @@ input[type="number"] {
   background-size: 200% auto;
   animation: gradient-shift 3s ease infinite;
 }
+
+.blue-component:hover {
+  background-size: 200% auto;
+  animation: gradient-shift 3s ease infinite;
+}
+.red-component:hover {
+  background-size: 200% auto;
+  animation: gradient-shift 3s ease infinite;
+}
+
 
 /* New styles for threshold slider */
 .threshold-row {
