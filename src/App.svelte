@@ -83,21 +83,21 @@
             inErasureRegion = x >= negThreshold && x <= threshold;
           } else {
             // When τ is negative: between -τ and τ
-            inErasureRegion = x >= negThreshold && x <= threshold;
+            inErasureRegion = x <= threshold;
           }
           
           // For negative tau erasure (in opposite direction)
           if (showNegativeTauErasure) {
             if (threshold > 0) {
-              inNegativeErasureRegion = x <= negThreshold;
+              inNegativeErasureRegion = x >= negThreshold && x <= threshold;
             } else {
-              inNegativeErasureRegion = x >= threshold;
+              inNegativeErasureRegion = x >= negThreshold;
             }
           }
         } else if (overlapMode === "right") {
           // When τ is positive: between τ and infinity
-          if (threshold > 0) {
-            inErasureRegion = x >= threshold;
+          if (threshold >= 0) {
+            inErasureRegion = x >= threshold ;
           } else {
             // When τ is negative: between -τ and τ
             inErasureRegion = x >= threshold && x <= negThreshold;
@@ -105,10 +105,10 @@
           
           // For negative tau erasure (in opposite direction)
           if (showNegativeTauErasure) {
-            if (threshold > 0) {
-              inNegativeErasureRegion = x >= negThreshold;
+            if (threshold >= 0) {
+              inNegativeErasureRegion = x <= negThreshold;
             } else {
-              inNegativeErasureRegion = x <= threshold;
+              inNegativeErasureRegion = x <= negThreshold && x >= threshold;
             }
           }
         }
@@ -240,7 +240,7 @@
         fill: 'tozeroy',
         fillcolor: 'rgba(66, 135, 245, 0.4)',  // Blue for signal -1
         line: { color: 'rgba(0,0,0,0)', width: 0 },  // Invisible line
-        name: 'Overlap (Signal 1 above)',
+        name: 'Bit flip (Signal -1 read as 1)',
         showlegend: true
       };
       
@@ -250,7 +250,7 @@
         fill: 'tozeroy',
         fillcolor: 'rgba(245, 66, 66, 0.4)',  // Red for signal 1
         line: { color: 'rgba(0,0,0,0)', width: 0 },  // Invisible line
-        name: 'Overlap (Signal -1 above)',
+        name: 'Bit flip (Signal 1 read as -1)',
         showlegend: true
       };
       
@@ -304,7 +304,7 @@
         fill: 'tozeroy',
         fillcolor: 'rgba(66, 135, 245, 0.4)',
         line: { color: 'rgba(0,0,0,0)', width: 0 },
-        name: `Overlap (Signal 1 above) ${overlapMode === "left" ? "Left" : "Right"} of τ`,
+        name: `Bit flip (Signal -1 read as 1)`,
         showlegend: true
       };
       
@@ -314,7 +314,7 @@
         fill: 'tozeroy',
         fillcolor: 'rgba(245, 66, 66, 0.4)',
         line: { color: 'rgba(0,0,0,0)', width: 0 },
-        name: `Overlap (Signal -1 above) ${overlapMode === "left" ? "Left" : "Right"} of τ`,
+        name: `Bit flip (Signal 1 read as -1)`,
         showlegend: true
       };
       
@@ -661,11 +661,11 @@
     <div bind:this={plotDiv} class="plot-container"></div>
   
     <div class="stats-container">
-      <h2>Current Visible Overlap Area: <span class="gradient-text">{overlapArea.toFixed(4)}</span></h2>
+      <h2>Current Visible Overlap Area (No Erasures): <span class="gradient-text">{overlapArea.toFixed(4)}</span></h2>
       
       <!-- Show error and erasure probabilities for modes with thresholds -->
       {#if overlapMode === "left" || overlapMode === "right"}
-        <h2>Bit Flip Probability (Pe): <span class="gradient-text error">{errorProbability.toFixed(4)}</span></h2>
+        <h2>Bit Flip Probability (Pe) (Visible Area w/Erasures): <span class="gradient-text error">{errorProbability.toFixed(4)}</span></h2>
         <h2>Erasure Probability (Pc): <span class="gradient-text erasure">{erasureProbability.toFixed(4)}</span></h2>
       {/if}
     </div>
@@ -676,27 +676,28 @@
         <li>Zoom: Ctrl/Cmd + Scroll OR Zoom Motion (centered on mouse)</li>
         <li>Pan: Scroll left/right</li>
         <li>Adjust sliders: Hover over a slider and scroll/swipe</li>
+        <li>Click legend: Toggle components visually without adjusting logic </li>
       </ul>
       
       <div class="formula-explanation">
         {#if overlapMode === "baseline"}
-          <p><strong>Baseline Mode:</strong> Only overlap areas are colored, using the color of the curve directly above</p>
-          <p class="color-key"><span class="color-chip blue"></span> Blue fill: Overlap area where Signal 1 is above</p>
-          <p class="color-key"><span class="color-chip red"></span> Red fill: Overlap area where Signal -1 is above</p>
+          <p><strong>Baseline Mode:</strong> Only overlap areas are colored, using the color of the curve directly above. This signifies an incorrect reading (bit flip) when receiving a signal with noise.</p>
+          <p class="color-key"><span class="color-chip blue"></span> Blue fill: Overlap area where Signal -1 is misinterpreted as 1 in a bit flip</p>
+          <p class="color-key"><span class="color-chip red"></span> Red fill: Overlap area where Signal 1 is misinterpreted as -1 in a bit flip</p>
         {:else if overlapMode === "total"}
           <p><strong>Total Overlap Mode:</strong> The entire overlap area is highlighted in gold</p>
-          <p class="color-key"><span class="color-chip gold"></span> Gold fill: Total area where both curves overlap</p>
+          <p class="color-key"><span class="color-chip gold"></span> Gold fill: Total area where both curves overlap. Total bit flip area</p>
         {:else if overlapMode === "left"}
           <p><strong>Bit Flip Probability (Pe):</strong> P<sub>e</sub> = ∫<sub>τ</sub><sup>∞</sup> f<sub>1</sub>(x) dx + ∫<sub>-∞</sub><sup>-τ</sup> f<sub>2</sub>(x) dx</p>
           <p><strong>Erasure Probability (Pc):</strong> P<sub>c</sub> = ∫<sub>-τ</sub><sup>τ</sup> f<sub>1</sub>(x) dx + ∫<sub>-τ</sub><sup>τ</sup> f<sub>2</sub>(x) dx</p>
-          <p class="color-key"><span class="color-chip blue"></span> Blue fill: Overlap area where Signal 1 is above left of τ</p>
-          <p class="color-key"><span class="color-chip red"></span> Red fill: Overlap area where Signal -1 is above left of τ</p>
+          <p class="color-key"><span class="color-chip blue"></span> Blue fill: Overlap area where Signal -1 is not affected by erasure and bit flip occurs</p>
+          <p class="color-key"><span class="color-chip red"></span> Red fill: Overlap area where Signal 1 is not affected by erasure and bit flip occurs</p>
           <p class="color-key"><span class="color-chip green"></span> Green fill: Erasure region left of τ & right of -τ</p>
         {:else}
           <p><strong>Bit Flip Probability (Pe):</strong> P<sub>e</sub> = ∫<sub>τ</sub><sup>∞</sup> f<sub>1</sub>(x) dx + ∫<sub>-∞</sub><sup>-τ</sup> f<sub>2</sub>(x) dx</p>
           <p><strong>Erasure Probability (Pc):</strong> P<sub>c</sub> = ∫<sub>-τ</sub><sup>τ</sup> f<sub>1</sub>(x) dx + ∫<sub>-τ</sub><sup>τ</sup> f<sub>2</sub>(x) dx</p>
-          <p class="color-key"><span class="color-chip blue"></span> Blue fill: Overlap area where Signal 1 is above right of τ</p>
-          <p class="color-key"><span class="color-chip red"></span> Red fill: Overlap area where Signal -1 is above right of τ</p>
+          <p class="color-key"><span class="color-chip blue"></span> Blue fill: Overlap area where Signal -1 is not affected by erasure and bit flip occurs</p>
+          <p class="color-key"><span class="color-chip red"></span> Red fill: Overlap area where Signal 1 is not affected by erasure and bit flip occurs</p>
           <p class="color-key"><span class="color-chip green"></span> Green fill: Erasure region right of τ & left of -τ</p>
         {/if}
       </div>
