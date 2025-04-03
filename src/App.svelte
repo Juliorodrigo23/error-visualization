@@ -26,10 +26,51 @@
     return amplitude * (1 / (Math.sqrt(2 * Math.PI) * sigma)) * Math.exp(-((x - center) ** 2) / (2 * sigma * sigma));
   }
   
+  function computeBitFlipRegions(xValues, f1Values, f2Values, threshold) {
+  const f1ErrorValues = [];
+  const f2ErrorValues = [];
+
+  for (let i = 0; i < xValues.length; i++) {
+    const x = xValues[i];
+    const f1 = f1Values[i];
+    const f2 = f2Values[i];
+
+    // Signal -1 misread as 1 (x > τ)
+    f1ErrorValues.push(x >= threshold ? f1 : 0);
+    // Signal 1 misread as -1 (x < -τ)
+    f2ErrorValues.push(x <= -threshold ? f2 : 0);
+  }
+
+  return { f1ErrorValues, f2ErrorValues };
+}
+
+function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
+  const f1ErasureValues = [];
+  const f2ErasureValues = [];
+
+  const lowerTau = Math.min(threshold, -threshold);
+  const upperTau = Math.max(threshold, -threshold);
+
+  for (let i = 0; i < xValues.length; i++) {
+    const x = xValues[i];
+    const f1 = f1Values[i];
+    const f2 = f2Values[i];
+
+    const inErasure = x >= lowerTau && x <= upperTau;
+    f1ErasureValues.push(inErasure ? f1 : 0);
+    f2ErasureValues.push(inErasure ? f2 : 0);
+  }
+
+  return { f1ErasureValues, f2ErasureValues };
+}
+
+
   // Function to update the plot and compute the overlap area
   function updatePlot() {
     if (!plotDiv) return;
-  
+    const containerWidth = plotDiv.clientWidth;
+    const containerHeight = plotDiv.clientHeight;
+
     const xValues = [];
     const f1Values = [];
     const f2Values = [];
@@ -55,6 +96,8 @@
       f1Values.push(f1);
       f2Values.push(f2);
       
+
+
       // Min for total overlap
       const minVal = Math.min(f1, f2);
       minValues.push(minVal);
@@ -133,10 +176,19 @@
       // For erasure region calculations in all modes
       const lowerThreshold = Math.min(threshold, negThreshold);
       const upperThreshold = Math.max(threshold, negThreshold);
-      f1ErasureValues.push(x >= lowerThreshold && x <= upperThreshold ? f1 : 0);
-      f2ErasureValues.push(x >= lowerThreshold && x <= upperThreshold ? f2 : 0);
     }
   
+        if (overlapMode === "left" || overlapMode === "right") {
+          const result = computeBitFlipRegions(xValues, f1Values, f2Values, threshold);
+          f1ErrorValues.push(...result.f1ErrorValues);
+          f2ErrorValues.push(...result.f2ErrorValues);
+        }
+
+        const erasureResult = computeErasureRegions(xValues, f1Values, f2Values, threshold);
+        f1ErasureValues.push(...erasureResult.f1ErasureValues);
+        f2ErasureValues.push(...erasureResult.f2ErasureValues);
+
+
     // Calculate total overlap area (numerical integration using trapezoid rule)
     let totalOverlap = 0;
     for (let i = 0; i < minValues.length - 1; i++) {
@@ -188,35 +240,44 @@
       f2Error += (f2ErrorValues[i] + f2ErrorValues[i+1]) * dx / 2;
     }
     
-    let f1Erasure = 0;
-    let f2Erasure = 0;
-    for (let i = 0; i < xValues.length - 1; i++) {
-      const dx = xValues[i+1] - xValues[i];
-      f1Erasure += (f1ErasureValues[i] + f1ErasureValues[i+1]) * dx / 2;
-      f2Erasure += (f2ErasureValues[i] + f2ErasureValues[i+1]) * dx / 2;
-    }
 
     // Calculate erasure regions
     let visibleOverlap = totalOverlap;
-    let erasureProbSum = f1Erasure + f2Erasure;
-   
-    for (let i = 0; i < xValues.length - 1; i++) {
-      const dx = xValues[i+1] - xValues[i];
-      
-      if (overlapMode === "left" || overlapMode === "right") {
-        // Use precalculated values from the erasure region
-        erasureProbSum += (erasureRegionValues[i] + erasureRegionValues[i+1]) * dx / 2;
-      } else {
-        // For other modes, calculate using traditional method
-        const f1ErasureSum = (f1ErasureValues[i] + f1ErasureValues[i+1]) * dx / 2;
-        const f2ErasureSum = (f2ErasureValues[i] + f2ErasureValues[i+1]) * dx / 2;
-        erasureProbSum += f1ErasureSum + f2ErasureSum;
-      }
-    }
+    let erasureProbSum = 0;
     
     // Set probabilities
-    errorProbability = visibleOverlap - erasureProbSum;
-    erasureProbability = erasureProbSum;
+    let f1Erasure = 0;
+    let f2Erasure = 0;
+
+    const lowerTau = Math.min(threshold, -threshold);
+    const upperTau = Math.max(threshold, -threshold);
+
+    for (let i = 0; i < xValues.length - 1; i++) {
+      const dx = xValues[i + 1] - xValues[i];
+      const x = xValues[i];
+      const f1 = f1Values[i];
+      const f2 = f2Values[i];
+
+      // Erasure: x between -τ and τ
+      if (x >= lowerTau && x <= upperTau) {
+        f1Erasure += f1 * dx;
+        f2Erasure += f2 * dx;
+      }
+
+      // Bit flip: f1 error is when x > τ
+      if (x >= threshold) {
+        f1Error += f1 * dx;
+      }
+
+      // Bit flip: f2 error is when x < -τ
+      if (x <= -threshold) {
+        f2Error += f2 * dx;
+      }
+    }
+
+    errorProbability = f1Error + f2Error;
+    erasureProbability = f1Erasure + f2Erasure;
+
     
     // Set overlap area based on selected mode
     if (overlapMode === "total") {
@@ -433,15 +494,19 @@
         dtick: 1,
         tickmode: 'linear',
         range: [xStart, xEnd],
+        fixedrange: false,
         gridcolor: 'rgba(255, 255, 255, 0.1)',
         zerolinecolor: 'rgba(255, 255, 255, 0.2)'
       },
       yaxis: { 
         title: 'Probability Density',
         gridcolor: 'rgba(255, 255, 255, 0.1)',
+        autorange: true,
+        fixedrange: false,
         zerolinecolor: 'rgba(255, 255, 255, 0.2)'
       },
       showlegend: true,
+      autosize: false,
       margin: { t: 50, l: 50, r: 50, b: 50 },
       // These properties create the glass effect background
       paper_bgcolor: 'rgba(255, 255, 255, 0.05)',
@@ -460,10 +525,15 @@
     const config = {
       responsive: true,
       displayModeBar: true,
-      modeBarButtonsToRemove: ['select2d', 'lasso2d'] // Simplify the toolbar
+      modeBarButtonsToRemove: ['select2d', 'lasso2d'], // Simplify the toolbar
+      displayRatio: 1.6
     };
   
     Plotly.react(plotDiv, dataTraces, layout, config);
+    setTimeout(() => {
+      Plotly.Plots.resize(plotDiv);
+    }, 50);
+
   }
   
   onMount(() => {
@@ -713,7 +783,7 @@
     <div class="stats-container">
       <h2>
         Current Visible Overlap Area (No Erasures): 
-        <span class="gradient-text">{overlapArea.toFixed(4)}</span>
+        <span class="gradient-text">{overlapArea.toFixed(2)}</span>
         {#if overlapMode !== "total"}
         <div class="component-values">
           <span class="blue-component">Blue: {blueOverlapComponent.toFixed(2)}</span>
@@ -725,7 +795,7 @@
       {#if overlapMode === "left" || overlapMode === "right"}
         <h2>
           Bit Flip Probability (Pe): 
-          <span class="gradient-text error">{errorProbability.toFixed(4)}</span>
+          <span class="gradient-text error">{errorProbability.toFixed(2)}</span>
           <div class="component-values">
             <span class="blue-component">Blue: {blueOverlapComponent.toFixed(2)}</span>
             <span class="red-component">Red: {redOverlapComponent.toFixed(2)}</span>
@@ -742,7 +812,6 @@
         <li>Pan: Scroll left/right</li>
         <li>Adjust sliders: Hover over a slider and scroll/swipe</li>
         <li>Click legend: Toggle components visually without adjusting logic </li>
-        <li>*Blue and red limited to 2 decimals due to performance*</li>
       </ul>
       
       <div class="formula-explanation">
