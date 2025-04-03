@@ -58,7 +58,7 @@ Where:
 The overlap between two PDFs is defined as:
 
 $$
-\text{Overlap Area} = \int_{-\infty}^{\infty} \min \{ f_1(x), f_2(x) \} \, dx
+\text{Overlap Area} = \int_{-\infty}^{\infty} \min { f_1(x), f_2(x) } \, dx
 $$
 
 This integral is numerically approximated using the trapezoidal rule.
@@ -70,13 +70,13 @@ This integral is numerically approximated using the trapezoidal rule.
 - **Bit Flip (Error) Probability** $P_e$:
 
 $$
-P_e = \int_{\tau}^{\infty} f_1(x)\, dx + \int_{-\infty}^{-\tau} f_2(x)\, dx
+P_e = \int_{\tau}^{\infty} f_1(x) dx + \int_{-\infty}^{-\tau} f_2(x) dx
 $$
 
 - **Erasure Probability** $P_c$:
 
 $$
-P_c = \int_{-\tau}^{\tau} f_1(x)\, dx + \int_{-\tau}^{\tau} f_2(x)\, dx
+P_c = \int_{-\tau}^{\tau} f_1(x) dx + \int_{-\tau}^{\tau} f_2(x) dx
 $$
 
 ---
