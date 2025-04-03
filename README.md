@@ -58,8 +58,9 @@ Where:
 The overlap between two PDFs is defined as:
 
 $$
-\text{Overlap Area} = \int_{-\infty}^{\infty} \min \left\{ f_1(x), f_2(x) \right\} \, dx
+\text{Overlap Area} = \int_{-\infty}^{\infty} \min\left\{ f_1(x), f_2(x) \right\} \, dx
 $$
+
 
 This integral is numerically approximated using the trapezoidal rule.
 
