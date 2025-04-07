@@ -16,7 +16,7 @@
   let showNegativeTauErasure = false;
   let blueOverlapComponent = 0; // For tracking signal -1 component (blue fill)
   let redOverlapComponent = 0;  // For tracking signal 1 component (red fill)
-
+  let correctProbability = 0; // Pc - correct probability
   
   let xStart = -5; // Initial x-axis range
   let xEnd = 5;
@@ -195,6 +195,14 @@ function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
       totalOverlap += (minValues[i] + minValues[i + 1]) * step / 2;
     }
     
+    let area1 = 0, area2 = 0;
+    for (let i = 0; i < xValues.length - 1; i++) {
+      const dx = xValues[i + 1] - xValues[i];
+      area1 += (f1Values[i] + f1Values[i + 1]) * dx / 2;
+      area2 += (f2Values[i] + f2Values[i + 1]) * dx / 2;
+    }
+    const totalArea = area1 + area2;
+
     let redComponent = 0;
     let blueComponent = 0;
 
@@ -227,56 +235,83 @@ function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
     blueOverlapComponent = blueComponent;
     redOverlapComponent = redComponent;
 
-    // Calculate error regions (bit flips)
-    let f1Error = 0; // Area under f1 in error region
-    let f2Error = 0; // Area under f2 in error region
-    
-    // Calculate error regions based on the current mode
-    for (let i = 0; i < xValues.length - 1; i++) {
-      const dx = xValues[i+1] - xValues[i];
-      
-      // Calculate error probabilities
-      f1Error += (f1ErrorValues[i] + f1ErrorValues[i+1]) * dx / 2;
-      f2Error += (f2ErrorValues[i] + f2ErrorValues[i+1]) * dx / 2;
-    }
-    
-
-    // Calculate erasure regions
-    let visibleOverlap = totalOverlap;
-    let erasureProbSum = 0;
     
     // Set probabilities
-    let f1Erasure = 0;
-    let f2Erasure = 0;
+        // Use these variables for error and erasure after computing overlapArea
+    let f1Error = 0;
+    let f2Error = 0;
 
     const lowerTau = Math.min(threshold, -threshold);
     const upperTau = Math.max(threshold, -threshold);
+    f1Error = 0;
+    f2Error = 0;
 
     for (let i = 0; i < xValues.length - 1; i++) {
+      const xMid = (xValues[i] + xValues[i + 1]) / 2;
       const dx = xValues[i + 1] - xValues[i];
-      const x = xValues[i];
-      const f1 = f1Values[i];
-      const f2 = f2Values[i];
 
-      // Erasure: x between -τ and τ
-      if (x >= lowerTau && x <= upperTau) {
-        f1Erasure += f1 * dx;
-        f2Erasure += f2 * dx;
+      // Signal -1 misread as 1 (x > τ)
+      if (xMid >= threshold) {
+        f1Error += (f1Values[i] + f1Values[i + 1]) * dx / 2;
       }
 
-      // Bit flip: f1 error is when x > τ
-      if (x >= threshold) {
-        f1Error += f1 * dx;
-      }
-
-      // Bit flip: f2 error is when x < -τ
-      if (x <= -threshold) {
-        f2Error += f2 * dx;
+      // Signal 1 misread as -1 (x < -τ)
+      if (xMid <= -threshold) {
+        f2Error += (f2Values[i] + f2Values[i + 1]) * dx / 2;
       }
     }
+    errorProbability = (f1Error + f2Error);
 
-    errorProbability = f1Error + f2Error;
-    erasureProbability = f1Erasure + f2Erasure;
+    let f1ErasureArea = 0;
+    let f2ErasureArea = 0;
+
+    // --- Normalize full probability space ---
+    const totalF1Mass = area1;  // you already computed this earlier
+    const totalF2Mass = area2;
+
+
+
+    for (let i = 0; i < xValues.length - 1; i++) {
+      const xMid = (xValues[i] + xValues[i + 1]) / 2;
+      const dx = xValues[i + 1] - xValues[i];
+
+      if (xMid >= lowerTau && xMid <= upperTau) {
+        f1ErasureArea += (f1Values[i] + f1Values[i + 1]) * dx / 2;
+        f2ErasureArea += (f2Values[i] + f2Values[i + 1]) * dx / 2;
+      }
+    }
+    
+
+    let f1Correct = 0;
+    let f2Correct = 0;
+
+    for (let i = 0; i < xValues.length - 1; i++) {
+  const xMid = (xValues[i] + xValues[i + 1]) / 2;
+  const dx = xValues[i + 1] - xValues[i];
+
+  const inErrorF1 = xMid >= threshold;
+  const inErrorF2 = xMid <= -threshold;
+  const inErasure = xMid >= lowerTau && xMid <= upperTau;
+
+  if (xMid < threshold && !(xMid >= lowerTau && xMid <= upperTau)) {
+    f1Correct += (f1Values[i] + f1Values[i + 1]) * dx / 2;
+  }
+  
+  // For Signal 1 (red curve), it's correct when x > -threshold and not in erasure region
+  if (xMid > -threshold && !(xMid >= lowerTau && xMid <= upperTau)) {
+    f2Correct += (f2Values[i] + f2Values[i + 1]) * dx / 2;
+  }
+}
+
+const totalMass = totalF1Mass + totalF2Mass;
+const Pe = f1Error + f2Error;
+const Pc = f1ErasureArea + f2ErasureArea;
+
+
+
+    erasureProbability = (f1ErasureArea + f2ErasureArea)  / totalMass;
+
+    correctProbability = 1 - errorProbability - erasureProbability;
 
     
     // Set overlap area based on selected mode
@@ -796,12 +831,22 @@ function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
         <h2>
           Bit Flip Probability (Pe): 
           <span class="gradient-text error">{errorProbability.toFixed(2)}</span>
-          <div class="component-values">
-            <span class="blue-component">Blue: {blueOverlapComponent.toFixed(2)}</span>
-            <span class="red-component">Red: {redOverlapComponent.toFixed(2)}</span>
-          </div>
         </h2>
-        <h2>Erasure Probability (Pc): <span class="gradient-text erasure">{erasureProbability.toFixed(4)}</span></h2>
+        <h2>Erasure Probability (Pc): <span class="gradient-text erasure">{erasureProbability.toFixed(2)}</span></h2>
+        <h2>Classification Probabilities:</h2>
+        <div class="probability-bar">
+          <div class="bar-fill">
+            <div class="bar-section correct" style="width: {100 * correctProbability}%" title="Correct"></div>
+            <div class="bar-section erasure" style="width: {100 * erasureProbability}%" title="Erasure"></div>
+            <div class="bar-section error" style="width: {100 * errorProbability}%" title="Bit Flip"></div>
+          </div>
+          <div class="bar-labels">
+            <div class="label-section correct">✅ Correct {Math.round(100 * correctProbability)}%</div>
+            <div class="label-section erasure">⚠️ Erased {Math.round(100 * erasureProbability)}%</div>
+            <div class="label-section error">❌ Bitflip {Math.round(100 * errorProbability)}%</div>
+          </div>
+        </div>
+        
       {/if}
     </div>
     

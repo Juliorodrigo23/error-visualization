@@ -463,3 +463,48 @@ input:checked + .toggle-slider:before {
   animation: toggle-swipe 0.5s;
 }
 
+
+.probability-bar {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.bar-fill {
+  display: flex;
+  height: 30px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.bar-section {
+  height: 100%;
+  font-size: 0; /* hide text inside */
+}
+
+.bar-section.correct {
+  background-color: rgba(46, 204, 113, 0.7);
+}
+
+.bar-section.erasure {
+  background-color: rgba(241, 196, 15, 0.7);
+}
+
+.bar-section.error {
+  background-color: rgba(231, 76, 60, 0.7);
+}
+
+.bar-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.label-section {
+  text-align: center;
+  flex: 1;
+}
