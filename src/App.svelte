@@ -21,6 +21,48 @@
   let xStart = -5; // Initial x-axis range
   let xEnd = 5;
   
+  function isErased(x) {
+    let inErasure = false;
+    let inNegErasure = false;
+
+    if (overlapMode === "left") {
+      if (threshold > 0) {
+        inErasure = x >= -threshold && x <= threshold;
+      } else {
+        inErasure = x <= threshold;
+      }
+      if (showNegativeTauErasure) {
+        if (threshold > 0) {
+          inNegErasure = x >= -threshold && x <= threshold;
+        } else {
+          inNegErasure = x >= -threshold;
+        }
+      }
+    }
+
+    else if (overlapMode === "right") {
+      if (threshold >= 0) {
+        inErasure = x >= threshold;
+      } else {
+        inErasure = x >= threshold && x <= -threshold;
+      }
+      if (showNegativeTauErasure) {
+        if (threshold >= 0) {
+          inNegErasure = x <= -threshold;
+        } else {
+          inNegErasure = x <= -threshold && x >= threshold;
+        }
+      }
+    }
+
+    if (inErasure && inNegErasure) {
+      inNegErasure = false;
+    }
+
+    return inErasure || inNegErasure;
+  }
+
+
   // Gaussian PDF function
   function gaussian(x, center, sigma, amplitude) {
     return amplitude * (1 / (Math.sqrt(2 * Math.PI) * sigma)) * Math.exp(-((x - center) ** 2) / (2 * sigma * sigma));
@@ -250,60 +292,127 @@ function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
       const xMid = (xValues[i] + xValues[i + 1]) / 2;
       const dx = xValues[i + 1] - xValues[i];
 
-      // Signal -1 misread as 1 (x > τ)
-      if (xMid >= threshold) {
+      // Skip anything in the erasure region
+      const inErasure = isErased(xMid);
+      if (inErasure) continue;
+
+      // Outside erasure: count Pe correctly
+      if (xMid > upperTau) {
         f1Error += (f1Values[i] + f1Values[i + 1]) * dx / 2;
       }
-
-      // Signal 1 misread as -1 (x < -τ)
-      if (xMid <= -threshold) {
+      if (xMid < lowerTau) {
         f2Error += (f2Values[i] + f2Values[i + 1]) * dx / 2;
       }
     }
-    errorProbability = (f1Error + f2Error);
+    
+    const totalF1Mass = area1;
+    const totalF2Mass = area2;
+    const totalMass = totalF1Mass + totalF2Mass;
+    errorProbability = (f1Error + f2Error) ;
 
     let f1ErasureArea = 0;
     let f2ErasureArea = 0;
 
-    // --- Normalize full probability space ---
-    const totalF1Mass = area1;  // you already computed this earlier
-    const totalF2Mass = area2;
-
-
+    
 
     for (let i = 0; i < xValues.length - 1; i++) {
       const xMid = (xValues[i] + xValues[i + 1]) / 2;
       const dx = xValues[i + 1] - xValues[i];
 
-      if (xMid >= lowerTau && xMid <= upperTau) {
+      let inErasureRegion = false;
+      let inNegativeErasureRegion = false;
+
+      if (overlapMode === "left") {
+        if (threshold > 0) {
+          inErasureRegion = xMid >= -threshold && xMid <= threshold;
+        } else {
+          inErasureRegion = xMid <= threshold;
+        }
+
+        if (showNegativeTauErasure) {
+          if (threshold > 0) {
+            inNegativeErasureRegion = xMid >= -threshold && xMid <= threshold;
+          } else {
+            inNegativeErasureRegion = xMid >= -threshold;
+          }
+        }
+      } else if (overlapMode === "right") {
+        if (threshold >= 0) {
+          inErasureRegion = xMid >= threshold;
+        } else {
+          inErasureRegion = xMid >= threshold && xMid <= -threshold;
+        }
+
+        if (showNegativeTauErasure) {
+          if (threshold >= 0) {
+            inNegativeErasureRegion = xMid <= -threshold;
+          } else {
+            inNegativeErasureRegion = xMid <= -threshold && xMid >= threshold;
+          }
+        }
+      }
+
+      // Avoid double-counting if both regions overlap
+      if (inErasureRegion && inNegativeErasureRegion) {
+        inNegativeErasureRegion = false;
+      }
+
+      if (inErasureRegion || inNegativeErasureRegion) {
         f1ErasureArea += (f1Values[i] + f1Values[i + 1]) * dx / 2;
         f2ErasureArea += (f2Values[i] + f2Values[i + 1]) * dx / 2;
       }
     }
-    
-
-    let f1Correct = 0;
-    let f2Correct = 0;
 
     for (let i = 0; i < xValues.length - 1; i++) {
-  const xMid = (xValues[i] + xValues[i + 1]) / 2;
-  const dx = xValues[i + 1] - xValues[i];
+    const xMid = (xValues[i] + xValues[i + 1]) / 2;
+    const dx = xValues[i + 1] - xValues[i];
 
-  const inErrorF1 = xMid >= threshold;
-  const inErrorF2 = xMid <= -threshold;
-  const inErasure = xMid >= lowerTau && xMid <= upperTau;
+    let inErasureRegion = false;
+    let inNegativeErasureRegion = false;
 
-  if (xMid < threshold && !(xMid >= lowerTau && xMid <= upperTau)) {
-    f1Correct += (f1Values[i] + f1Values[i + 1]) * dx / 2;
+    if (overlapMode === "left") {
+      if (threshold > 0) {
+        inErasureRegion = xMid >= -threshold && xMid <= threshold;
+      } else {
+        inErasureRegion = xMid <= threshold;
+      }
+
+      if (showNegativeTauErasure) {
+        if (threshold > 0) {
+          inNegativeErasureRegion = xMid >= -threshold && xMid <= threshold;
+        } else {
+          inNegativeErasureRegion = xMid >= -threshold;
+        }
+      }
+    } else if (overlapMode === "right") {
+      if (threshold >= 0) {
+        inErasureRegion = xMid >= threshold;
+      } else {
+        inErasureRegion = xMid >= threshold && xMid <= -threshold;
+      }
+
+      if (showNegativeTauErasure) {
+        if (threshold >= 0) {
+          inNegativeErasureRegion = xMid <= -threshold;
+        } else {
+          inNegativeErasureRegion = xMid <= -threshold && xMid >= threshold;
+        }
+      }
+    }
+
+    if (inErasureRegion && inNegativeErasureRegion) {
+      inNegativeErasureRegion = false;
+    }
+
+    const isErased = inErasureRegion || inNegativeErasureRegion;
+
+    // Only count as error if NOT in erasure region
+    
   }
-  
-  // For Signal 1 (red curve), it's correct when x > -threshold and not in erasure region
-  if (xMid > -threshold && !(xMid >= lowerTau && xMid <= upperTau)) {
-    f2Correct += (f2Values[i] + f2Values[i + 1]) * dx / 2;
-  }
-}
 
-const totalMass = totalF1Mass + totalF2Mass;
+    // Calculate total mass for normalization
+
+
 const Pe = f1Error + f2Error;
 const Pc = f1ErasureArea + f2ErasureArea;
 
