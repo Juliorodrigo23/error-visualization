@@ -22,45 +22,55 @@
   let xEnd = 5;
   
   function isErased(x) {
-    let inErasure = false;
-    let inNegErasure = false;
+  let inErasure = false;
+  let inNegErasure = false;
 
-    if (overlapMode === "left") {
+  if (overlapMode === "left") {
+    if (threshold > 0) {
+      // When τ is positive in left mode: erase between -τ and τ
+      inErasure = x >= -threshold && x <= threshold;
+    } else {
+      // When τ is negative in left mode: erase x <= τ
+      inErasure = x <= threshold;
+    }
+    
+    if (showNegativeTauErasure) {
       if (threshold > 0) {
-        inErasure = x >= -threshold && x <= threshold;
+        // When τ is positive: negative tau erasure is same as positive (-τ to τ)
+        inNegErasure = x >= -threshold && x <= threshold;
       } else {
-        inErasure = x <= threshold;
-      }
-      if (showNegativeTauErasure) {
-        if (threshold > 0) {
-          inNegErasure = x >= -threshold && x <= threshold;
-        } else {
-          inNegErasure = x >= -threshold;
-        }
+        // When τ is negative: negative tau erasure is x >= -τ
+        inNegErasure = x >= -threshold;
       }
     }
-
-    else if (overlapMode === "right") {
-      if (threshold >= 0) {
-        inErasure = x >= threshold;
-      } else {
-        inErasure = x >= threshold && x <= -threshold;
-      }
-      if (showNegativeTauErasure) {
-        if (threshold >= 0) {
-          inNegErasure = x <= -threshold;
-        } else {
-          inNegErasure = x <= -threshold && x >= threshold;
-        }
-      }
-    }
-
-    if (inErasure && inNegErasure) {
-      inNegErasure = false;
-    }
-
-    return inErasure || inNegErasure;
   }
+  else if (overlapMode === "right") {
+    if (threshold >= 0) {
+      // When τ is positive in right mode: erase x >= τ
+      inErasure = x >= threshold;
+    } else {
+      // When τ is negative in right mode: erase between τ and -τ
+      inErasure = x >= threshold && x <= -threshold;
+    }
+    
+    if (showNegativeTauErasure) {
+      if (threshold >= 0) {
+        // When τ is positive: negative tau erasure is x <= -τ
+        inNegErasure = x <= -threshold;
+      } else {
+        // When τ is negative: negative tau erasure is already covered by main erasure
+        inNegErasure = false;
+      }
+    }
+  }
+
+  // Handle overlap - only count once
+  if (inErasure && inNegErasure) {
+    inNegErasure = false;
+  }
+
+  return inErasure || inNegErasure;
+}
 
 
   // Gaussian PDF function
@@ -69,22 +79,29 @@
   }
   
   function computeBitFlipRegions(xValues, f1Values, f2Values, threshold) {
-  const f1ErrorValues = [];
-  const f2ErrorValues = [];
+    const f1ErrorValues = [];
+    const f2ErrorValues = [];
 
-  for (let i = 0; i < xValues.length; i++) {
-    const x = xValues[i];
-    const f1 = f1Values[i];
-    const f2 = f2Values[i];
+    for (let i = 0; i < xValues.length; i++) {
+      const x = xValues[i];
+      const f1 = f1Values[i];
+      const f2 = f2Values[i];
 
-    // Signal -1 misread as 1 (x > τ)
-    f1ErrorValues.push(x >= threshold ? f1 : 0);
-    // Signal 1 misread as -1 (x < -τ)
-    f2ErrorValues.push(x <= -threshold ? f2 : 0);
+      // Skip if in erasure region
+      if (isErased(x)) {
+        f1ErrorValues.push(0);
+        f2ErrorValues.push(0);
+        continue;
+      }
+
+      // Signal -1 misread as 1 (x > 0)
+      f1ErrorValues.push(x > 0 ? f1 : 0);
+      // Signal 1 misread as -1 (x < 0)
+      f2ErrorValues.push(x < 0 ? f2 : 0);
+    }
+
+    return { f1ErrorValues, f2ErrorValues };
   }
-
-  return { f1ErrorValues, f2ErrorValues };
-}
 
 function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
   const f1ErasureValues = [];
@@ -296,11 +313,13 @@ function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
       const inErasure = isErased(xMid);
       if (inErasure) continue;
 
-      // Outside erasure: count Pe correctly
-      if (xMid > upperTau) {
+      // Outside erasure: count bit flips based on the midpoint between distributions
+      // For signal -1 (f1): bit flip when x > 0 and not in erasure
+      if (xMid > 0) {
         f1Error += (f1Values[i] + f1Values[i + 1]) * dx / 2;
       }
-      if (xMid < lowerTau) {
+      // For signal 1 (f2): bit flip when x < 0 and not in erasure
+      if (xMid < 0) {
         f2Error += (f2Values[i] + f2Values[i + 1]) * dx / 2;
       }
     }

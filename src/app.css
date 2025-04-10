@@ -485,15 +485,57 @@ input:checked + .toggle-slider:before {
 }
 
 .bar-section.correct {
-  background-color: rgba(46, 204, 113, 0.7);
+  background: linear-gradient(90deg, rgb(0, 255, 106) 0%, rgb(0, 171, 71) 25%, rgb(0, 161, 67) 75%, rgb(0, 255, 106) 100%);
+  background-size: 200% auto;
+  animation: gradient-shift-correct 5s ease infinite;
 }
 
 .bar-section.erasure {
-  background-color: rgba(241, 196, 15, 0.7);
+  background: linear-gradient(90deg, #ffc800 0%, #ffd727 25%, #ac8e14 75%,  #ffc800 100%);
+  background-size: 200% auto;
+  animation: gradient-shift-erasure 5s ease infinite;
 }
 
 .bar-section.error {
-  background-color: rgba(231, 76, 60, 0.7);
+  background: linear-gradient(90deg, #ff0000 0%, #840f02 25%,  #b61908 75%, #ff0000 100%);
+  background-size: 200% auto;
+  animation: gradient-shift-error 5s ease infinite;
+}
+
+@keyframes gradient-shift-correct {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 200% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes gradient-shift-erasure {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 200% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes gradient-shift-error {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 200% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 .bar-labels {
