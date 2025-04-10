@@ -109,6 +109,7 @@ button:focus-visible {
 
 .slider-container label {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 10px;
 }
@@ -186,6 +187,7 @@ button:focus-visible {
   border-radius: 8px;
   background-color: rgba(30, 30, 30, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 70vw;
 }
 
 /* Fix bullet alignment */
@@ -485,21 +487,23 @@ input:checked + .toggle-slider:before {
 }
 
 .bar-section.correct {
-  background: linear-gradient(90deg, rgb(0, 255, 106) 0%, rgb(0, 171, 71) 25%, rgb(0, 161, 67) 75%, rgb(0, 255, 106) 100%);
+  background: linear-gradient(90deg,rgb(0, 255, 106) 0%,  rgb(0, 216, 90) 20%,  rgb(0, 161, 67) 50%,  rgb(0, 216, 90) 80%, rgb(0, 255, 106) 100%);
   background-size: 200% auto;
-  animation: gradient-shift-correct 5s ease infinite;
+  animation: gradient-shift-correct 5s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  animation-delay: 2.4s;
 }
 
 .bar-section.erasure {
   background: linear-gradient(90deg, #ffc800 0%, #ffd727 25%, #ac8e14 75%,  #ffc800 100%);
   background-size: 200% auto;
-  animation: gradient-shift-erasure 5s ease infinite;
+  animation: gradient-shift-erasure 5s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  animation-delay: 4s;
 }
 
 .bar-section.error {
-  background: linear-gradient(90deg, #ff0000 0%, #840f02 25%,  #b61908 75%, #ff0000 100%);
+  background: linear-gradient(90deg, #ff0000 0%, #af1200 25%,  #b61908 75%, #ff0000 100%);
   background-size: 200% auto;
-  animation: gradient-shift-error 5s ease infinite;
+  animation: gradient-shift-error 5s cubic-bezier(0.25, 1, 0.5, 1) infinite;
 }
 
 @keyframes gradient-shift-correct {
@@ -550,3 +554,87 @@ input:checked + .toggle-slider:before {
   text-align: center;
   flex: 1;
 }
+
+.area-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  position: relative; /* Needed for absolute positioning of the pseudo-element */
+}
+
+.area-summary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%); /* Center the line */
+  width: 2px; /* Adjust for line thickness */
+  background-color: rgba(255, 255, 255, 0.1); /* Subtle color */
+  opacity: 0.5; /* Make it more subtle */
+}
+
+.area-box {
+  flex: 1;
+  min-width: 250px;
+  padding: 5px;
+  border-radius: 8px;
+}
+
+.area-box h2 {
+  margin-top: 0;
+}
+
+.explanation-box {
+  position: relative;
+  padding: 1rem 1rem 1rem 1.25rem; /* extra space on left for pseudo-border */
+  margin-top: 1rem;
+  text-align: left;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+.explanation-box::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 4px;
+  border-radius: 0.5rem 0 0 0.5rem;
+  background: linear-gradient(180deg, #4158D0 0%, #C850C0 50%, #FFCC70 100%);
+  animation: gradient-shift-box 5s ease infinite;
+  box-shadow: 0 0 10px rgba(255, 204, 112, 0.5);
+  background-size: 100% 200%;
+  background-repeat: no-repeat;
+}
+
+@keyframes gradient-shift-box {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 0% 100%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+.explanation-box ul {
+  padding-left: 1rem;
+  margin: 0.5rem 0;
+}
+
+.explanation-box li {
+  margin-bottom: 0.4rem;
+}
+
+.explanation-box ul {
+  padding-left: 0;
+  margin-left: 0;
+  list-style-position: inside;
+}
+

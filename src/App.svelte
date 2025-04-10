@@ -17,6 +17,10 @@
   let blueOverlapComponent = 0; // For tracking signal -1 component (blue fill)
   let redOverlapComponent = 0;  // For tracking signal 1 component (red fill)
   let correctProbability = 0; // Pc - correct probability
+  let topCurveArea = 0; // Area of the top curve
+  let topCurveAreaRed = 0;
+  let topCurveAreaBlue = 0;
+
   
   let xStart = -5; // Initial x-axis range
   let xEnd = 5;
@@ -294,7 +298,40 @@ function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
     blueOverlapComponent = blueComponent;
     redOverlapComponent = redComponent;
 
+    topCurveArea = 0;
+    topCurveAreaRed = 0; // ← You were missing this!
+    topCurveAreaBlue = 0;
     
+    for (let i = 0; i < xValues.length - 1; i++) {
+  const dx = xValues[i + 1] - xValues[i];
+
+  const f1 = f1Values[i];
+  const f2 = f2Values[i];
+  const f1Next = f1Values[i + 1];
+  const f2Next = f2Values[i + 1];
+
+  const topCurr = Math.max(f1, f2);
+  const topNext = Math.max(f1Next, f2Next);
+  const segmentArea = (topCurr + topNext) * dx / 2;
+
+  topCurveArea += segmentArea;
+
+  const f1IsTopCurr = f1 > f2;
+  const f1IsTopNext = f1Next > f2Next;
+  const f2IsTopCurr = f2 > f1;
+  const f2IsTopNext = f2Next > f1Next;
+
+  // If same curve is on top at both ends — full credit
+  if (f1IsTopCurr && f1IsTopNext) {
+    topCurveAreaBlue += segmentArea;
+  } else if (f2IsTopCurr && f2IsTopNext) {
+    topCurveAreaRed += segmentArea;
+  } else {
+    // Split fairly if there's a crossover or equality
+    topCurveAreaBlue += segmentArea / 2;
+    topCurveAreaRed += segmentArea / 2;
+  }
+}
     // Set probabilities
         // Use these variables for error and erasure after computing overlapArea
     let f1Error = 0;
@@ -327,7 +364,7 @@ function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
     const totalF1Mass = area1;
     const totalF2Mass = area2;
     const totalMass = totalF1Mass + totalF2Mass;
-    errorProbability = (f1Error + f2Error) ;
+    errorProbability = (f1Error + f2Error) / totalMass;
 
     let f1ErasureArea = 0;
     let f2ErasureArea = 0;
@@ -944,16 +981,34 @@ const Pc = f1ErasureArea + f2ErasureArea;
     <div bind:this={plotDiv} class="plot-container"></div>
   
     <div class="stats-container">
-      <h2>
-        Current Visible Overlap Area (No Erasures): 
-        <span class="gradient-text">{overlapArea.toFixed(2)}</span>
-        {#if overlapMode !== "total"}
-        <div class="component-values">
-          <span class="blue-component">Blue: {blueOverlapComponent.toFixed(2)}</span>
-          <span class="red-component">Red: {redOverlapComponent.toFixed(2)}</span>
+      <div class="area-summary">
+        <div class="area-box">
+          <h2> Overlap Area: 
+            <span class="gradient-text">{overlapArea.toFixed(2)}</span>
+          </h2>
+          {#if overlapMode !== "total"}
+          Area under the bottom curve:
+          <div class="component-values">
+            <span class="blue-component">Blue: {blueOverlapComponent.toFixed(2)}</span>
+            <span class="red-component">Red: {redOverlapComponent.toFixed(2)}</span>
+          </div>
+          {/if}
         </div>
-        {/if}
-      </h2>
+      
+        <div class="area-box">
+          <h2>Total Area: 
+            <span class="gradient-text">{topCurveArea.toFixed(2)}</span>
+          </h2>
+          {#if overlapMode !== "total"}
+          Area under the top curve:
+            <div class="component-values">
+              <span class="blue-component">Blue: {topCurveAreaBlue.toFixed(2)}</span>
+              <span class="red-component">Red: {topCurveAreaRed.toFixed(2)}</span>
+            </div>
+          {/if}
+        </div>
+      </div>
+      
       <!-- Show error and erasure probabilities for modes with thresholds -->
       {#if overlapMode === "left" || overlapMode === "right"}
         <h2>
@@ -990,24 +1045,39 @@ const Pc = f1ErasureArea + f2ErasureArea;
       <div class="formula-explanation">
         {#if overlapMode === "baseline"}
           <p><strong>Baseline Mode:</strong> Only overlap areas are colored, using the color of the curve directly above. This signifies an incorrect reading (bit flip) when receiving a signal with noise.</p>
-          <p class="color-key"><span class="color-chip blue"></span> Blue fill: Overlap area where Signal -1 is misinterpreted as 1 in a bit flip</p>
-          <p class="color-key"><span class="color-chip red"></span> Red fill: Overlap area where Signal 1 is misinterpreted as -1 in a bit flip</p>
+          <p class="color-key"><span class="color-chip blue"></span><strong> Blue fill: </strong>&nbsp;Overlap area where Signal -1 is misinterpreted as 1 in a bit flip</p>
+          <p class="color-key"><span class="color-chip red"></span> <strong>Red fill:</strong>&nbsp; Overlap area where Signal 1 is misinterpreted as -1 in a bit flip</p>
         {:else if overlapMode === "total"}
           <p><strong>Total Overlap Mode:</strong> The entire overlap area is highlighted in gold</p>
-          <p class="color-key"><span class="color-chip gold"></span> Gold fill: Total area where both curves overlap. Total bit flip area</p>
+          <p class="color-key"><span class="color-chip gold"></span> <strong>Gold fill: </strong> &nbsp;Total area where both curves overlap. Total bit flip area</p>
         {:else if overlapMode === "left"}
           <p><strong>Bit Flip Probability (Pe):</strong> P<sub>e</sub> = ∫<sub>τ</sub><sup>∞</sup> f<sub>1</sub>(x) dx + ∫<sub>-∞</sub><sup>-τ</sup> f<sub>2</sub>(x) dx</p>
           <p><strong>Erasure Probability (Pc):</strong> P<sub>c</sub> = ∫<sub>-τ</sub><sup>τ</sup> f<sub>1</sub>(x) dx + ∫<sub>-τ</sub><sup>τ</sup> f<sub>2</sub>(x) dx</p>
-          <p class="color-key"><span class="color-chip blue"></span> Blue fill: Overlap area where Signal -1 is not affected by erasure and bit flip occurs</p>
-          <p class="color-key"><span class="color-chip red"></span> Red fill: Overlap area where Signal 1 is not affected by erasure and bit flip occurs</p>
-          <p class="color-key"><span class="color-chip green"></span> Green fill: Erasure region left of τ & right of -τ</p>
+          <p class="color-key"><span class="color-chip blue"></span> Blue fill: &nbsp; Overlap area where Signal -1 is not affected by erasure and bit flip occurs</p>
+          <p class="color-key"><span class="color-chip red"></span> Red fill: &nbsp; Overlap area where Signal 1 is not affected by erasure and bit flip occurs</p>
+          <p class="color-key"><span class="color-chip green"></span> Green fill: &nbsp; Erasure region left of τ & right of -τ</p>
         {:else}
           <p><strong>Bit Flip Probability (Pe):</strong> P<sub>e</sub> = ∫<sub>τ</sub><sup>∞</sup> f<sub>1</sub>(x) dx + ∫<sub>-∞</sub><sup>-τ</sup> f<sub>2</sub>(x) dx</p>
           <p><strong>Erasure Probability (Pc):</strong> P<sub>c</sub> = ∫<sub>-τ</sub><sup>τ</sup> f<sub>1</sub>(x) dx + ∫<sub>-τ</sub><sup>τ</sup> f<sub>2</sub>(x) dx</p>
-          <p class="color-key"><span class="color-chip blue"></span> Blue fill: Overlap area where Signal -1 is not affected by erasure and bit flip occurs</p>
-          <p class="color-key"><span class="color-chip red"></span> Red fill: Overlap area where Signal 1 is not affected by erasure and bit flip occurs</p>
-          <p class="color-key"><span class="color-chip green"></span> Green fill: Erasure region right of τ & left of -τ</p>
+          <p class="color-key"><span class="color-chip blue"></span> <strong> Blue fill: &nbsp;  </strong> Overlap area where Signal -1 is not affected by erasure and bit flip occurs</p>
+          <p class="color-key"><span class="color-chip red"></span> <strong>Red fill: &nbsp; </strong> Overlap area where Signal 1 is not affected by erasure and bit flip occurs</p>
+          <p class="color-key"><span class="color-chip green"></span> <strong> Green fill: &nbsp; </strong> Erasure region right of τ & left of -τ</p>
         {/if}
+        {#if overlapMode !== "total"}
+        <div class="explanation-box">
+          <h3>📌 Why Overlap ≠ Bit-Flip</h3>
+          <ul>
+            <li><strong>Overlap </strong> &nbsp; means both signal PDFs are nonzero at the same &nbsp; <code>x</code> &nbsp; values  —it doesn't always mean a misclassification.</li>
+            <li>A &nbsp; <strong>bit flip </strong> &nbsp; only occurs when a measurement lands on the &nbsp; <em>wrong side</em> &nbsp; of the threshold  for the actual signal that generated it.</li>
+            <li>Even inside the overlap region, large portions may still be on the &nbsp; <strong>correct</strong> &nbsp; side for each signal.</li>
+            <li>If an &nbsp; <strong>erasure region</strong> &nbsp; is active, some potential bit flips are relabeled as erasures,  reducing the flip count further.</li>
+          </ul>
+          <p>
+            💡 This is why the <strong>bit-flip probability</strong>  &nbsp; is typically smaller than the raw overlap area or a simple "overlap ÷ total" estimate.
+          </p>
+        </div>
+      {/if}
+
       </div>
     </div>
   </div>
