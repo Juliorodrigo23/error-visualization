@@ -34,6 +34,9 @@ body {
 h1 {
   font-size: 2em;
   line-height: 1.1;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1); /* or use any subtle color */
+  display: inline-block; /* important to keep underline width just around text */
+  padding-bottom: 0.2em;
 }
 
 .card {
@@ -123,15 +126,17 @@ button:focus-visible {
 /* Glass effect for plot container */
 .plot-container {
   width: 100%;
-  max-width: 700px;
+  min-height: 400px;
+  min-width: 50vw;
+  max-width: 50vw;
   align-self: center;
   height: 500px;
   margin: 20px auto;
   padding: 10px;
   transition: all 0.3s ease;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  justify-content: stretch;
+  align-items: stretch;
   background-color: transparent;
 }
 
@@ -404,7 +409,7 @@ input[type="number"] {
 /* Add this to the CSS section */
 /* Toggle Switch */
 .toggle-container {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   margin-top: 10px;
   gap: 10px;
@@ -638,3 +643,46 @@ input:checked + .toggle-slider:before {
   list-style-position: inside;
 }
 
+.visualization-container {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.miniplot-container {
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  margin-right: 10px;
+}
+
+.fullplot-container {
+  width: 100%;
+  min-height: 400px;
+}
+
+.bec-container {
+  flex-grow: 1;
+  padding-top: 20vh;
+}
+
+
+.view-container {
+  width: 100%;
+  position: relative;
+}
+
+/* Ensure containers maintain their size when hidden */
+.plot-container[style*="display:none"] {
+  visibility: hidden;
+  position: absolute;
+  z-index: -1;
+}
+
+.area-box[style*="display:none"] {
+  visibility: hidden;
+  position: absolute;
+  z-index: -1;
+}

@@ -1,7 +1,6 @@
 <script>
   import { onMount } from 'svelte';
   import Plotly from 'plotly.js-dist-min';
-  
   let sigma1 = 1;
   let sigma2 = 1;
   let amplitude1 = 1;
@@ -20,11 +19,66 @@
   let topCurveArea = 0; // Area of the top curve
   let topCurveAreaRed = 0;
   let topCurveAreaBlue = 0;
-
+  let scaleBEC = false;  // false means show BEC tiny; true scales it to normal siz
+  let correctBECBlue = 0;
+  let correctBECRed = 0;
   
   let xStart = -5; // Initial x-axis range
   let xEnd = 5;
   
+  $: lineColor = calculateLineColor(erasureProbability);
+  $: lineWidth = calculateLineWidth(erasureProbability);
+
+  
+
+// Helper function to convert a hex color string to an RGB object
+function hexToRgb(hex) {
+  // Remove '#' if present
+  hex = hex.replace(/^#/, '');
+  // Expand shorthand form (e.g. "03F") to full form ("0033FF")
+  if (hex.length === 3) {
+    hex = hex.split('').map(c => c + c).join('');
+  }
+  const bigint = parseInt(hex, 16);
+  return {
+    r: (bigint >> 16) & 255,
+    g: (bigint >> 8) & 255,
+    b: bigint & 255
+  };
+}
+
+// Helper function to interpolate between two hex colors given a factor t (0 <= t <= 1)
+function interpolateColor(color1, color2, t) {
+  const c1 = hexToRgb(color1);
+  const c2 = hexToRgb(color2);
+  const r = Math.round(c1.r + (c2.r - c1.r) * t);
+  const g = Math.round(c1.g + (c2.g - c1.g) * t);
+  const b = Math.round(c1.b + (c2.b - c1.b) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+// Main function to calculate the line color based on probability (0 <= prob <= 1)
+function calculateLineColor(prob) {
+  // Clamp the probability to [0, 1] if necessary
+  prob = Math.min(1, Math.max(0, prob));
+
+  if (prob <= 0.5) {
+    // For probabilities between 0 and 0.5, interpolate between #4158D0 and #C850C0
+    let t = prob / 0.5; // Normalizes the value so that 0->0 and 0.5->1
+    return interpolateColor("#4158D0", "#C850C0", t);
+  } else {
+    // For probabilities between 0.5 and 1, interpolate between #C850C0 and #FFCC70
+    let t = (prob - 0.5) / 0.5; // Normalizes the value so that 0.5->0 and 1->1
+    return interpolateColor("#C850C0", "#ffcc00", t);
+  }
+}
+
+
+  function calculateLineWidth(prob) {
+    return Math.max(1, prob * 8); // Stroke width between 1 and (close to) 8
+  }
+
+
   function isErased(x) {
   let inErasure = false;
   let inNegErasure = false;
@@ -478,7 +532,12 @@ const Pc = f1ErasureArea + f2ErasureArea;
 
     correctProbability = 1 - errorProbability - erasureProbability;
 
+    const NormalizedBECBlue = topCurveAreaBlue / totalMass;
+    const NormalizedcorrectBECRed = topCurveAreaRed / totalMass;
     
+    correctBECBlue = NormalizedBECBlue - errorProbability;
+    correctBECRed = NormalizedcorrectBECRed - errorProbability;
+
     // Set overlap area based on selected mode
     if (overlapMode === "total") {
       overlapArea = totalOverlap;
@@ -732,16 +791,24 @@ const Pc = f1ErasureArea + f2ErasureArea;
     Plotly.react(plotDiv, dataTraces, layout, config);
     setTimeout(() => {
       Plotly.Plots.resize(plotDiv);
-    }, 50);
+    }, 200);
 
   }
   
   onMount(() => {
-    updatePlot();
-    plotDiv.addEventListener("wheel", handleTrackpadScroll);
-    // Add mouse move event to track mouse position
-    plotDiv.addEventListener("mousemove", trackMousePosition);
-  });
+  // Wait for DOM to be ready
+  setTimeout(() => {
+    
+    // Add listeners after initial plot is ready
+    if (plotDiv) {
+      plotDiv.addEventListener("wheel", handleTrackpadScroll);
+      plotDiv.addEventListener("mousemove", trackMousePosition);
+    }
+  }, 200);
+  updatePlot();
+  
+});
+
   
   // Track mouse position for zooming
   let lastMouseX = 0;
@@ -889,8 +956,24 @@ const Pc = f1ErasureArea + f2ErasureArea;
   
   // Handler for overlap mode change
   function handleOverlapModeChange() {
-    updatePlot();
-  }
+  // Keep this call as required
+  updatePlot();
+  
+  // Add a delayed resize sequence for the first change
+  setTimeout(() => {
+    if (plotDiv) {
+      // Force Plotly to detect new container size
+      Plotly.relayout(plotDiv, {
+        autosize: false
+      });
+      
+      // Final resize after relayout
+      setTimeout(() => {
+        Plotly.Plots.resize(plotDiv);
+      }, 100);
+    }
+  }, 100);
+}
   </script>
   
   <div class="container">
@@ -976,12 +1059,78 @@ const Pc = f1ErasureArea + f2ErasureArea;
         </div>
       </div>
       {/if}
+      {#if overlapMode !== "total"}
+      <div class="threshold-container">
+  <div class="toggle-container">
+      <label class="toggle-switch">
+          <input type="checkbox" bind:checked={scaleBEC}>
+          <span class="toggle-slider"></span>
+        </label>
+      <span>Show Binary Erasure Channel (BEC)</span>
+  </div>
+</div>
+{/if}
+
     </div>
   
-    <div bind:this={plotDiv} class="plot-container"></div>
+    <!-- Wrap the two plots in a flex container -->
+<div class="plots-wrapper" style="display: flex; gap: 20px; align-items: flex-start;">
+  <!-- Main Plot container remains as is -->
+  <div bind:this={plotDiv} class="plot-container"></div>
+  
+  <!-- New BEC container -->
+  <div class="bec-container" 
+       style="width: {scaleBEC ? '400px' : '1px'}; height: {scaleBEC ? '400px' : '1px'};">
+    <!-- Insert your BEC SVG here (or call a function to render it) -->
+    <svg viewBox="0 0 270 150" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="becGradient" x1="0" y1="0" x2="250" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#4158D0"/>
+          <stop offset="50%" stop-color="#C850C0"/>
+          <stop offset="100%" stop-color="#FFCC70"/>
+        </linearGradient>
+      </defs>
+      <text x="130" y="140" text-anchor="middle" fill="white" font-size="10">Binary Erasure Channel</text>
+      <!-- CONNECTION LINES WITH GRADIENT -->
+      <line x1="40" y1="40" x2="210" y2="40" stroke="{lineColor}" stroke-width="{lineWidth}" stroke-linecap="round"/>
+      <line x1="40" y1="110" x2="210" y2="110" stroke="{lineColor}" stroke-width="{lineWidth}" stroke-linecap="round"/>
+      <line x1="40" y1="40" x2="210" y2="75" stroke="{lineColor}" stroke-width="{lineWidth}" stroke-linecap="round"/>
+      <line x1="40" y1="110" x2="210" y2="75" stroke="{lineColor}" stroke-width="{lineWidth}" stroke-linecap="round"/>
+
+      <!-- LEFT INPUTS -->
+      <circle cx="30" cy="40" r="10" fill="#4158D0" />
+      <text x="30" y="44" text-anchor="middle" fill="white" font-size="10">-1</text>
+      <text x="10" y="44" text-anchor="end" fill="white" font-size="10">In</text>
+      
+      <circle cx="30" cy="110" r="10" fill="#FF4D4D" />
+      <text x="30" y="114" text-anchor="middle" fill="white" font-size="10">1</text>
+      <text x="10" y="114" text-anchor="end" fill="white" font-size="10">In</text>
+      
+      <!-- RIGHT OUTPUTS -->
+      <circle cx="220" cy="40" r="10" fill="#4158D0" />
+      <text x="220" y="44" text-anchor="middle" fill="white" font-size="10">-1</text>
+      <text x="250" y="44" text-anchor="middle" fill="white" font-size="10">Out</text>
+
+      <circle cx="220" cy="75" r="10" fill="green" />
+      <text x="220" y="79" text-anchor="middle" fill="white" font-size="10">?</text>
+      <text x="250" y="79" text-anchor="middle" fill="white" font-size="10">Erased</text>
+      
+      <circle cx="220" cy="110" r="10" fill="#FF4D4D" />
+      <text x="220" y="114" text-anchor="middle" fill="white" font-size="10">1</text>
+      <text x="250" y="114" text-anchor="middle" fill="white" font-size="10">Out</text>
+      
+      
+
+      
+    </svg>
+  </div>
+</div>
+
   
     <div class="stats-container">
+      <h1> Area Calculations </h1> 
       <div class="area-summary">
+        
         <div class="area-box">
           <h2> Overlap Area: 
             <span class="gradient-text">{overlapArea.toFixed(2)}</span>
@@ -1011,12 +1160,13 @@ const Pc = f1ErasureArea + f2ErasureArea;
       
       <!-- Show error and erasure probabilities for modes with thresholds -->
       {#if overlapMode === "left" || overlapMode === "right"}
-        <h2>
+      <h1>Classification Probabilities:</h1>  
+      <h2>
           Bit Flip Probability (Pe): 
           <span class="gradient-text error">{errorProbability.toFixed(2)}</span>
         </h2>
         <h2>Erasure Probability (Pc): <span class="gradient-text erasure">{erasureProbability.toFixed(2)}</span></h2>
-        <h2>Classification Probabilities:</h2>
+        
         <div class="probability-bar">
           <div class="bar-fill">
             <div class="bar-section correct" style="width: {100 * correctProbability}%" title="Correct"></div>
@@ -1041,7 +1191,7 @@ const Pc = f1ErasureArea + f2ErasureArea;
         <li>Adjust sliders: Hover over a slider and scroll/swipe</li>
         <li>Click legend: Toggle components visually without adjusting logic </li>
       </ul>
-      
+      <p><strong>*Calculations are done on what is visible in the plot</strong></p>
       <div class="formula-explanation">
         {#if overlapMode === "baseline"}
           <p><strong>Baseline Mode:</strong> Only overlap areas are colored, using the color of the curve directly above. This signifies an incorrect reading (bit flip) when receiving a signal with noise.</p>
