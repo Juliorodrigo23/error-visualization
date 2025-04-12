@@ -22,14 +22,23 @@
   let scaleBEC = false;  // false means show BEC tiny; true scales it to normal siz
   let correctBECBlue = 0;
   let correctBECRed = 0;
+  let bitflipBlueComponent = 0;
+  let bitflipRedComponent = 0;
+  let erasureBlueComponent = 0;
+  let erasureRedComponent = 0;
+
   
   let xStart = -5; // Initial x-axis range
   let xEnd = 5;
   
   $: lineColor = calculateLineColor(erasureProbability);
   $: lineWidth = calculateLineWidth(erasureProbability);
-
-  
+  $: correctBlueStyle = getLineStyle(correctBECBlue);
+  $: correctRedStyle = getLineStyle(correctBECRed);
+  $: erasureBlueStyle = getLineStyle(erasureBlueComponent);
+  $: erasureRedStyle = getLineStyle(erasureRedComponent);
+  $: flipBlueStyle = getLineStyle(bitflipBlueComponent);
+  $: flipRedStyle = getLineStyle(bitflipRedComponent);
 
 // Helper function to convert a hex color string to an RGB object
 function hexToRgb(hex) {
@@ -73,9 +82,16 @@ function calculateLineColor(prob) {
   }
 }
 
+function getLineStyle(prob) {
+  const color = calculateLineColor(prob);
+  const width = calculateLineWidth(prob);
+  return { color, width };
+}
+
+
 
   function calculateLineWidth(prob) {
-    return Math.max(1, prob * 8); // Stroke width between 1 and (close to) 8
+    return Math.max(0, prob*5); // Stroke width between 1 and (close to) 8
   }
 
 
@@ -532,11 +548,16 @@ const Pc = f1ErasureArea + f2ErasureArea;
 
     correctProbability = 1 - errorProbability - erasureProbability;
 
-    const NormalizedBECBlue = topCurveAreaBlue / totalMass;
-    const NormalizedcorrectBECRed = topCurveAreaRed / totalMass;
+        // Assign individual components
+    bitflipBlueComponent = f1Error / totalMass;  // Signal -1 (blue) flipped to 1
+    bitflipRedComponent = f2Error / totalMass;   // Signal 1 (red) flipped to -1
+
+    erasureBlueComponent = f1ErasureArea / totalF1Mass; // Signal -1 erased
+    erasureRedComponent = f2ErasureArea / totalF2Mass;  // Signal 1 erased
+
     
-    correctBECBlue = NormalizedBECBlue - errorProbability;
-    correctBECRed = NormalizedcorrectBECRed - errorProbability;
+    correctBECBlue = 1 - erasureBlueComponent;
+    correctBECRed = 1 - erasureRedComponent;
 
     // Set overlap area based on selected mode
     if (overlapMode === "total") {
@@ -1082,7 +1103,7 @@ const Pc = f1ErasureArea + f2ErasureArea;
   <div class="bec-container" 
        style="width: {scaleBEC ? '400px' : '1px'}; height: {scaleBEC ? '400px' : '1px'};">
     <!-- Insert your BEC SVG here (or call a function to render it) -->
-    <svg viewBox="0 0 270 150" preserveAspectRatio="xMidYMid meet">
+    <svg viewBox="0 0 270 160" preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="becGradient" x1="0" y1="0" x2="250" y2="0" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stop-color="#4158D0"/>
@@ -1090,12 +1111,48 @@ const Pc = f1ErasureArea + f2ErasureArea;
           <stop offset="100%" stop-color="#FFCC70"/>
         </linearGradient>
       </defs>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+      <text x="130" y="20" text-anchor="middle" fill="white" font-size="10">Per-Signal Breakdown</text>
       <text x="130" y="140" text-anchor="middle" fill="white" font-size="10">Binary Erasure Channel</text>
+      <text x="130" y="150" text-anchor="middle" fill="white" font-size="8">(based on graph)</text>
       <!-- CONNECTION LINES WITH GRADIENT -->
-      <line x1="40" y1="40" x2="210" y2="40" stroke="{lineColor}" stroke-width="{lineWidth}" stroke-linecap="round"/>
-      <line x1="40" y1="110" x2="210" y2="110" stroke="{lineColor}" stroke-width="{lineWidth}" stroke-linecap="round"/>
-      <line x1="40" y1="40" x2="210" y2="75" stroke="{lineColor}" stroke-width="{lineWidth}" stroke-linecap="round"/>
-      <line x1="40" y1="110" x2="210" y2="75" stroke="{lineColor}" stroke-width="{lineWidth}" stroke-linecap="round"/>
+      <line x1="40" y1="40" x2="210" y2="40"
+      stroke="{correctBlueStyle.color}"
+      stroke-width="{correctBlueStyle.width}"
+      stroke-linecap="round" />
+
+    <line x1="40" y1="110" x2="210" y2="110"
+      stroke="{correctRedStyle.color}"
+      stroke-width="{correctRedStyle.width}"
+      stroke-linecap="round" />
+
+    <line x1="40" y1="40" x2="210" y2="75"
+      stroke="{erasureBlueStyle.color}"
+      stroke-width="{erasureBlueStyle.width}"
+      stroke-linecap="round" />
+
+    <line x1="40" y1="110" x2="210" y2="75"
+      stroke="{erasureRedStyle.color}"
+      stroke-width="{erasureRedStyle.width}"
+      stroke-linecap="round" />
+
+
+    <line x1="40" y1="40" x2="210" y2="110"
+      stroke="{flipBlueStyle.color}"
+      stroke-width="{flipBlueStyle.width}"
+      stroke-linecap="round" />
+
+    <line x1="40" y1="110" x2="210" y2="40"
+      stroke="{flipRedStyle.color}"
+      stroke-width="{flipRedStyle.width}"
+      stroke-linecap="round" />
 
       <!-- LEFT INPUTS -->
       <circle cx="30" cy="40" r="10" fill="#4158D0" />
@@ -1160,13 +1217,19 @@ const Pc = f1ErasureArea + f2ErasureArea;
       
       <!-- Show error and erasure probabilities for modes with thresholds -->
       {#if overlapMode === "left" || overlapMode === "right"}
-      <h1>Classification Probabilities:</h1>  
+      <h1>Classification Probabilities</h1>  
       <h2>
           Bit Flip Probability (Pe): 
-          <span class="gradient-text error">{errorProbability.toFixed(2)}</span>
+        <span class="gradient-text error">{errorProbability.toFixed(2)}</span>  
         </h2>
-        <h2>Erasure Probability (Pc): <span class="gradient-text erasure">{erasureProbability.toFixed(2)}</span></h2>
-        
+        <span class="blue-component">Incorrect Blue as Red: {bitflipBlueComponent.toFixed(2)}</span>
+        <span class="red-component">Incorrect Red as Blue: {bitflipRedComponent.toFixed(2)}</span>
+        <h2>Erasure Probability (Pc): <span class="gradient-text erasure">{erasureProbability.toFixed(2)}</span>
+        </h2>
+        <span class="greenblue-component">Erased Blue: {erasureBlueComponent.toFixed(2)}</span>
+              <span class="greenred-component">Erased Red: {erasureRedComponent.toFixed(2)}</span>
+        <br> 
+        <h1>Probability bar</h1>
         <div class="probability-bar">
           <div class="bar-fill">
             <div class="bar-section correct" style="width: {100 * correctProbability}%" title="Correct"></div>

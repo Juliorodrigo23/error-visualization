@@ -305,6 +305,24 @@ input[type="number"] {
   padding: 0 5px;
 }
 
+.greenblue-component{
+  background: #009f18;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: bold;
+  padding: 0 5px;
+}
+
+.greenred-component{
+  background: #009f18;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: bold;
+  padding: 0 5px;
+}
+
 /* Optional: add animation to make it more dynamic */
 @keyframes gradient-shift {
   0% {
