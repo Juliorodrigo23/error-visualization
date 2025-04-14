@@ -26,6 +26,16 @@
   let bitflipRedComponent = 0;
   let erasureBlueComponent = 0;
   let erasureRedComponent = 0;
+  let bitflipBlueComponentOfTotal = 0;
+  let bitflipRedComponentOfTotal = 0;
+  let bitflipBlueComponentOfBlue = 0;
+  let bitflipRedComponentOfRed = 0;
+  let erasureBlueComponentOfTotal = 0;
+  let erasureRedComponentOfTotal = 0;
+  let erasureBlueComponentOfBlue = 0;
+  let erasureRedComponentOfRed = 0;
+  let totalBitflip = 0;
+  let totalErasure = 0;
 
   
   let xStart = -5; // Initial x-axis range
@@ -152,46 +162,49 @@ function getLineStyle(prob) {
     return amplitude * (1 / (Math.sqrt(2 * Math.PI) * sigma)) * Math.exp(-((x - center) ** 2) / (2 * sigma * sigma));
   }
   
-  function computeBitFlipRegions(xValues, f1Values, f2Values, threshold) {
-    const f1ErrorValues = [];
-    const f2ErrorValues = [];
-
-    for (let i = 0; i < xValues.length; i++) {
-      const x = xValues[i];
-      const f1 = f1Values[i];
-      const f2 = f2Values[i];
-
-      // Skip if in erasure region
-      if (isErased(x)) {
-        f1ErrorValues.push(0);
-        f2ErrorValues.push(0);
-        continue;
-      }
-
-      // Signal -1 misread as 1 (x > 0)
-      f1ErrorValues.push(x > 0 ? f1 : 0);
-      // Signal 1 misread as -1 (x < 0)
-      f2ErrorValues.push(x < 0 ? f2 : 0);
-    }
-
-    return { f1ErrorValues, f2ErrorValues };
-  }
-
-function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
-  const f1ErasureValues = [];
-  const f2ErasureValues = [];
-
-  const lowerTau = Math.min(threshold, -threshold);
-  const upperTau = Math.max(threshold, -threshold);
+  function computeBitFlipRegions(xValues, f1Values, f2Values) {
+  const f1ErrorValues = [];
+  const f2ErrorValues = [];
 
   for (let i = 0; i < xValues.length; i++) {
     const x = xValues[i];
-    const f1 = f1Values[i];
-    const f2 = f2Values[i];
+    const f1 = f1Values[i]; // Signal -1 (blue)
+    const f2 = f2Values[i]; // Signal 1 (red)
 
-    const inErasure = x >= lowerTau && x <= upperTau;
-    f1ErasureValues.push(inErasure ? f1 : 0);
-    f2ErasureValues.push(inErasure ? f2 : 0);
+    // Skip if in erasure region
+    if (isErased(x)) {
+      f1ErrorValues.push(0);
+      f2ErrorValues.push(0);
+      continue;
+    }
+
+    // Bit flips only occur in overlap regions
+    const overlapValue = Math.min(f1, f2);
+    
+    // Signal -1 (blue) misread as 1 (x > 0)
+    f1ErrorValues.push(x > 0 ? overlapValue : 0);
+    
+    // Signal 1 (red) misread as -1 (x < 0)
+    f2ErrorValues.push(x < 0 ? overlapValue : 0);
+  }
+
+  return { f1ErrorValues, f2ErrorValues };
+}
+
+function computeErasureRegions(xValues, f1Values, f2Values) {
+  const f1ErasureValues = [];
+  const f2ErasureValues = [];
+
+  for (let i = 0; i < xValues.length; i++) {
+    const x = xValues[i];
+    const f1 = f1Values[i]; // Signal -1 (blue)
+    const f2 = f2Values[i]; // Signal 1 (red)
+
+    // Check if the point is in the erasure region
+    const erased = isErased(x);
+    
+    f1ErasureValues.push(erased ? f1 : 0);
+    f2ErasureValues.push(erased ? f2 : 0);
   }
 
   return { f1ErasureValues, f2ErasureValues };
@@ -391,19 +404,17 @@ function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
   const f2IsTopCurr = f2 > f1;
   const f2IsTopNext = f2Next > f1Next;
 
-  // If same curve is on top at both ends — full credit
-  if (f1IsTopCurr && f1IsTopNext) {
-    topCurveAreaBlue += segmentArea;
-  } else if (f2IsTopCurr && f2IsTopNext) {
-    topCurveAreaRed += segmentArea;
-  } else {
-    // Split fairly if there's a crossover or equality
-    topCurveAreaBlue += segmentArea / 2;
-    topCurveAreaRed += segmentArea / 2;
-  }
+  const sumCurr = f1 + f2 + 1e-12;   // add small constant to avoid division by zero
+  const sumNext = f1Next + f2Next + 1e-12;
+  const fractionBlue = (f1 / sumCurr + f1Next / sumNext) / 2;
+  const fractionRed  = (f2 / sumCurr + f2Next / sumNext) / 2;
+
+  topCurveAreaBlue += segmentArea * fractionBlue; 
+  topCurveAreaRed  += segmentArea * fractionRed;
+
+
+
 }
-    // Set probabilities
-        // Use these variables for error and erasure after computing overlapArea
     let f1Error = 0;
     let f2Error = 0;
 
@@ -411,25 +422,10 @@ function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
     const upperTau = Math.max(threshold, -threshold);
     f1Error = 0;
     f2Error = 0;
+    let f1CorrectArea = 0;
+    let f2CorrectArea = 0;
 
-    for (let i = 0; i < xValues.length - 1; i++) {
-      const xMid = (xValues[i] + xValues[i + 1]) / 2;
-      const dx = xValues[i + 1] - xValues[i];
-
-      // Skip anything in the erasure region
-      const inErasure = isErased(xMid);
-      if (inErasure) continue;
-
-      // Outside erasure: count bit flips based on the midpoint between distributions
-      // For signal -1 (f1): bit flip when x > 0 and not in erasure
-      if (xMid > 0) {
-        f1Error += (f1Values[i] + f1Values[i + 1]) * dx / 2;
-      }
-      // For signal 1 (f2): bit flip when x < 0 and not in erasure
-      if (xMid < 0) {
-        f2Error += (f2Values[i] + f2Values[i + 1]) * dx / 2;
-      }
-    }
+    
     
     const totalF1Mass = area1;
     const totalF2Mass = area2;
@@ -439,6 +435,24 @@ function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
     let f1ErasureArea = 0;
     let f2ErasureArea = 0;
 
+    // Compute per-signal correctness, bitflip, and erasure probabilities:
+    const correctBlue = f1CorrectArea / totalF1Mass;
+    const flippedBlue = f1Error / totalF1Mass;
+    const erasedBlue  = f1ErasureArea / totalF1Mass;  // assuming f1ErasureArea is already accumulated
+
+    const correctRed  = f2CorrectArea / totalF2Mass;
+    const flippedRed  = f2Error / totalF2Mass;
+    const erasedRed   = f2ErasureArea / totalF2Mass;  // similarly for Signal 1
+
+    // Now assign these to your BEC visualization variables:
+    correctBECBlue = f1CorrectArea / totalF1Mass;
+    correctBECRed  = f2CorrectArea / totalF2Mass;
+
+    bitflipBlueComponent = flippedBlue;
+    erasureBlueComponent = erasedBlue;
+
+    bitflipRedComponent  = flippedRed;
+    erasureRedComponent  = erasedRed;
     
 
     for (let i = 0; i < xValues.length - 1; i++) {
@@ -483,101 +497,105 @@ function computeErasureRegions(xValues, f1Values, f2Values, threshold) {
         inNegativeErasureRegion = false;
       }
 
-      if (inErasureRegion || inNegativeErasureRegion) {
-        f1ErasureArea += (f1Values[i] + f1Values[i + 1]) * dx / 2;
-        f2ErasureArea += (f2Values[i] + f2Values[i + 1]) * dx / 2;
-      }
     }
 
     for (let i = 0; i < xValues.length - 1; i++) {
-    const xMid = (xValues[i] + xValues[i + 1]) / 2;
-    const dx = xValues[i + 1] - xValues[i];
+  const xMid = (xValues[i] + xValues[i + 1]) / 2;
+  const dx = xValues[i + 1] - xValues[i];
+  const f1 = f1Values[i]; // Blue curve
+  const f2 = f2Values[i]; // Red curve
+  const f1Next = f1Values[i + 1];
+  const f2Next = f2Values[i + 1];
 
-    let inErasureRegion = false;
-    let inNegativeErasureRegion = false;
-
-    if (overlapMode === "left") {
-      if (threshold > 0) {
-        inErasureRegion = xMid >= -threshold && xMid <= threshold;
-      } else {
-        inErasureRegion = xMid <= threshold;
-      }
-
-      if (showNegativeTauErasure) {
-        if (threshold > 0) {
-          inNegativeErasureRegion = xMid >= -threshold && xMid <= threshold;
-        } else {
-          inNegativeErasureRegion = xMid >= -threshold;
-        }
-      }
-    } else if (overlapMode === "right") {
-      if (threshold >= 0) {
-        inErasureRegion = xMid >= threshold;
-      } else {
-        inErasureRegion = xMid >= threshold && xMid <= -threshold;
-      }
-
-      if (showNegativeTauErasure) {
-        if (threshold >= 0) {
-          inNegativeErasureRegion = xMid <= -threshold;
-        } else {
-          inNegativeErasureRegion = xMid <= -threshold && xMid >= threshold;
-        }
-      }
-    }
-
-    if (inErasureRegion && inNegativeErasureRegion) {
-      inNegativeErasureRegion = false;
-    }
-
-    const isErased = inErasureRegion || inNegativeErasureRegion;
-
-    // Only count as error if NOT in erasure region
+  // Check if point is in erasure region
+  const inErasure = isErased(xMid);
+  
+  // Calculate average values for this segment
+  const f1Avg = (f1 + f1Next) / 2;
+  const f2Avg = (f2 + f2Next) / 2;
+  const segmentArea = dx; // Unit area for this segment
+  
+  // FIX 1: Bit flips are only calculated in overlap areas not in erasure region
+  if (!inErasure) {
+    const overlapValue = Math.min(f1Avg, f2Avg);
     
+    // For signal -1 (blue): bit flip when x > 0 (incorrect as red)
+    if (xMid > 0) {
+      f1Error += overlapValue * segmentArea;
+    }
+    
+    // For signal 1 (red): bit flip when x < 0 (incorrect as blue)
+    if (xMid < 0) {
+      f2Error += overlapValue * segmentArea;
+    }
+    
+    // Calculate correct classifications too
+    if (xMid < 0) {  // Signal -1 (blue) correctly identified
+      f1CorrectArea += f1Avg * segmentArea;
+    }
+    
+    if (xMid > 0) {  // Signal 1 (red) correctly identified
+      f2CorrectArea += f2Avg * segmentArea;
+    }
+  } else {
+    // FIX 1: If in erasure region, add to erasure area
+    f1ErasureArea += f1Avg * segmentArea;
+    f2ErasureArea += f2Avg * segmentArea;
   }
+}
 
-    // Calculate total mass for normalization
+// METRIC TYPE A: Bitflip components as proportion of total bitflip probability
+// This shows how much each color contributes to the total error
+totalBitflip = f1Error + f2Error;
+bitflipBlueComponentOfTotal = f1Error / totalMass;
+bitflipRedComponentOfTotal = f2Error / totalMass;
+
+// METRIC TYPE B: Bitflip as proportion of each signal
+// This shows what percentage of each signal is misclassified
+bitflipBlueComponentOfBlue = f1Error / totalF1Mass;
+bitflipRedComponentOfRed = f2Error / totalF2Mass;
 
 
-const Pe = f1Error + f2Error;
-const Pc = f1ErasureArea + f2ErasureArea;
+// METRIC TYPE C: Erasure components as proportion of total erasure
+totalErasure = f1ErasureArea + f2ErasureArea;
+erasureBlueComponentOfTotal = f1ErasureArea / totalMass;
+erasureRedComponentOfTotal = f2ErasureArea / totalMass;
+
+// METRIC TYPE D: Erasure as proportion of each signal
+erasureBlueComponentOfBlue = f1ErasureArea / totalF1Mass;
+erasureRedComponentOfRed = f2ErasureArea / totalF2Mass;
+errorProbability = (f1Error + f2Error) / totalMass;
+erasureProbability = (f1ErasureArea + f2ErasureArea) / totalMass;
+correctProbability = 1 - errorProbability - erasureProbability;
+
+// Assign individual components for visualization
+bitflipBlueComponent = bitflipBlueComponentOfBlue;
+bitflipRedComponent = bitflipRedComponentOfRed;
+erasureBlueComponent = erasureBlueComponentOfBlue;
+erasureRedComponent = erasureRedComponentOfRed;
+correctBECBlue = f1CorrectArea / totalF1Mass;
+correctBECRed = f2CorrectArea / totalF2Mass;
 
 
 
-    erasureProbability = (f1ErasureArea + f2ErasureArea)  / totalMass;
-
-    correctProbability = 1 - errorProbability - erasureProbability;
-
-        // Assign individual components
-    bitflipBlueComponent = f1Error / totalMass;  // Signal -1 (blue) flipped to 1
-    bitflipRedComponent = f2Error / totalMass;   // Signal 1 (red) flipped to -1
-
-    erasureBlueComponent = f1ErasureArea / totalF1Mass; // Signal -1 erased
-    erasureRedComponent = f2ErasureArea / totalF2Mass;  // Signal 1 erased
-
-    
-    correctBECBlue = 1 - erasureBlueComponent;
-    correctBECRed = 1 - erasureRedComponent;
 
     // Set overlap area based on selected mode
-    if (overlapMode === "total") {
-      overlapArea = totalOverlap;
-    } else if (overlapMode === "left") {
-      let leftOverlap = 0;
-      for (let i = 0; i < leftOfThresholdValues.length - 1; i++) {
-        leftOverlap += (leftOfThresholdValues[i] + leftOfThresholdValues[i + 1]) * step / 2;
-      }
-      overlapArea = totalOverlap;
-    } else if (overlapMode === "right") {
-      let rightOverlap = 0;
-      for (let i = 0; i < rightOfThresholdValues.length - 1; i++) {
-        rightOverlap += (rightOfThresholdValues[i] + rightOfThresholdValues[i + 1]) * step / 2;
-      }
-      overlapArea = totalOverlap;
-    } else {
-      // In baseline mode, show the total overlap
-      overlapArea = totalOverlap;
-    }
+    if (overlapMode === "left") {
+  let leftOverlap = 0;
+  for (let i = 0; i < leftOfThresholdValues.length - 1; i++) {
+    leftOverlap += (leftOfThresholdValues[i] + leftOfThresholdValues[i + 1]) * step / 2;
+  }
+  overlapArea = leftOverlap;
+} else if (overlapMode === "right") {
+  let rightOverlap = 0;
+  for (let i = 0; i < rightOfThresholdValues.length - 1; i++) {
+    rightOverlap += (rightOfThresholdValues[i] + rightOfThresholdValues[i + 1]) * step / 2;
+  }
+  overlapArea = rightOverlap;
+} else {
+  overlapArea = totalOverlap;
+}
+
   
     // Define traces for the two Gaussians and the region areas
     const trace1 = {
@@ -1190,7 +1208,7 @@ const Pc = f1ErasureArea + f2ErasureArea;
         
         <div class="area-box">
           <h2> Overlap Area: 
-            <span class="gradient-text">{overlapArea.toFixed(2)}</span>
+            <span class="gradient-text">{(blueOverlapComponent + redOverlapComponent).toFixed(2)}</span>
           </h2>
           {#if overlapMode !== "total"}
           Area under the bottom curve:
@@ -1219,17 +1237,30 @@ const Pc = f1ErasureArea + f2ErasureArea;
       {#if overlapMode === "left" || overlapMode === "right"}
       <h1>Classification Probabilities</h1>  
       <h2>
-          Bit Flip Probability (Pe): 
+        Total Bit Flip Probability: 
         <span class="gradient-text error">{errorProbability.toFixed(2)}</span>  
-        </h2>
-        <span class="blue-component">Incorrect Blue as Red: {bitflipBlueComponent.toFixed(2)}</span>
-        <span class="red-component">Incorrect Red as Blue: {bitflipRedComponent.toFixed(2)}</span>
-        <h2>Erasure Probability (Pc): <span class="gradient-text erasure">{erasureProbability.toFixed(2)}</span>
-        </h2>
-        <span class="greenblue-component">Erased Blue: {erasureBlueComponent.toFixed(2)}</span>
-              <span class="greenred-component">Erased Red: {erasureRedComponent.toFixed(2)}</span>
-        <br> 
-        <h1>Probability bar</h1>
+      </h2>
+      <div class="component-row">
+      <span class="component-block blue-component">Incorrect Blue as Red Constituent of Total Bitflip Probability: {bitflipBlueComponentOfTotal.toFixed(2)}</span>
+      <span class="component-block red-component">Incorrect Red as Blue Constituent of Total Bitflip Probability: {bitflipRedComponentOfTotal.toFixed(2)}</span>
+      </div>
+      <br>
+      <div class="component-row">
+        <span class="component-block blue-component">Incorrect Amount of Blue Out of Total Blue Signal: {bitflipBlueComponentOfBlue.toFixed(2)}</span>
+        <span class="component-block red-component">Incorrect Amount of Red Out of Total Red Signal: {bitflipRedComponentOfRed.toFixed(2)}</span>
+      </div>
+      <h2>Total Erasure Probability: <span class="gradient-text erasure">{erasureProbability.toFixed(2)}</span>
+      </h2>
+      <div class="component-row">
+        <span class="component-block greenblue-component">Blue Constituent of Total Erasure Probability: {erasureBlueComponentOfTotal.toFixed(2)}</span>
+        <span class="component-block greenred-component">Red Constituent of Total Erasure Probability: {erasureRedComponentOfTotal.toFixed(2)}</span>
+      </div>
+      <br>
+        <div class="component-row">
+        <span class="component-block greenblue-component">Amount of Total Blue Erased: {erasureBlueComponentOfBlue.toFixed(2)}</span>
+      <span class="component-block greenred-component">Amount of Total Red Erased: {erasureRedComponentOfRed.toFixed(2)}</span> <br>
+      </div>  
+      <h1>Probability bar</h1>
         <div class="probability-bar">
           <div class="bar-fill">
             <div class="bar-section correct" style="width: {100 * correctProbability}%" title="Correct"></div>
