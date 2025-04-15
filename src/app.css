@@ -203,13 +203,11 @@ button:focus-visible {
 }
 
 .instructions li {
-  display: flex;
   align-items: baseline;
   margin-bottom: 6px;
 }
 
 .instructions li::before {
-  content: "•";
   display: inline-block;
   width: 1em;
   margin-right: 0.5em;
@@ -609,6 +607,15 @@ input:checked + .toggle-slider:before {
 
 .explanation-box {
   position: relative;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  font-size: 1rem;
+  margin-left: 0;        /* <-- Left-align the box itself */
+  margin-right: auto;
+  flex-shrink: 0;
+  flex-grow: 0;
+  align-self: center;
+  line-height: 1.6;
   padding: 1rem 1rem 1rem 1.25rem; /* extra space on left for pseudo-border */
   margin-top: 1rem;
   text-align: left;
@@ -653,10 +660,12 @@ input:checked + .toggle-slider:before {
 }
 
 .explanation-box ul {
-  padding-left: 0;
+  padding-left: 1.25rem; /* or adjust as needed */
   margin-left: 0;
-  list-style-position: inside;
+  text-align: left;           
+  list-style-position: outside;
 }
+
 
 .visualization-container {
   display: flex;
@@ -717,3 +726,52 @@ input:checked + .toggle-slider:before {
   line-height: 1.4;
 }
 
+/* Add these styles to your CSS file to enhance legend interactivity */
+
+/* Highlight legend items on hover to show they're clickable */
+.legend .traces .legendtoggle {
+  cursor: pointer;
+}
+
+/* Add a subtle hover effect to legend items */
+.legend .traces:hover {
+  opacity: 0.8;
+}
+
+/* When a trace is toggled off, make the legend item more transparent */
+.legend .traces[style*="opacity: 0.2"] {
+  opacity: 0.5;
+}
+
+/* Optional: Add a tooltip to the legend hover */
+.legend .traces .legendtoggle:hover::after {
+  content: "Click to toggle";
+  position: absolute;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.legend .traces .legendtoggle:hover:hover::after {
+  opacity: 1;
+}
+
+/* Make the legend itself slightly more distinct */
+.js-plotly-plot .legend {
+  transition: opacity 0.3s ease;
+  border-radius: 5px;
+}
+
+.js-plotly-plot .legend:hover {
+  opacity: 1;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+}

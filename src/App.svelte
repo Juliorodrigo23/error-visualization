@@ -382,7 +382,7 @@ function computeErasureRegions(xValues, f1Values, f2Values) {
     redOverlapComponent = redComponent;
 
     topCurveArea = 0;
-    topCurveAreaRed = 0; // ← You were missing this!
+    topCurveAreaRed = 0; 
     topCurveAreaBlue = 0;
     
     for (let i = 0; i < xValues.length - 1; i++) {
@@ -517,64 +517,65 @@ function computeErasureRegions(xValues, f1Values, f2Values) {
   
   // FIX 1: Bit flips are only calculated in overlap areas not in erasure region
   if (!inErasure) {
-    const overlapValue = Math.min(f1Avg, f2Avg);
-    
-    // For signal -1 (blue): bit flip when x > 0 (incorrect as red)
-    if (xMid > 0) {
-      f1Error += overlapValue * segmentArea;
-    }
-    
-    // For signal 1 (red): bit flip when x < 0 (incorrect as blue)
-    if (xMid < 0) {
-      f2Error += overlapValue * segmentArea;
-    }
-    
-    // Calculate correct classifications too
-    if (xMid < 0) {  // Signal -1 (blue) correctly identified
-      f1CorrectArea += f1Avg * segmentArea;
-    }
-    
-    if (xMid > 0) {  // Signal 1 (red) correctly identified
-      f2CorrectArea += f2Avg * segmentArea;
-    }
-  } else {
-    // FIX 1: If in erasure region, add to erasure area
-    f1ErasureArea += f1Avg * segmentArea;
-    f2ErasureArea += f2Avg * segmentArea;
+  const overlapValue = Math.min(f1Avg, f2Avg);
+  
+  // For signal -1 (blue): bit flip when x > 0 (incorrect as red)
+  if (xMid > 0) {
+    f1Error += overlapValue * segmentArea;
   }
+  
+  // For signal 1 (red): bit flip when x < 0 (incorrect as blue)
+  if (xMid < 0) {
+    f2Error += overlapValue * segmentArea;
+  }
+  
+  // Calculate correct classifications too
+  if (xMid < 0) {  // Signal -1 (blue) correctly identified
+    f1CorrectArea += f1Avg * segmentArea;
+  }
+  
+  if (xMid > 0) {  // Signal 1 (red) correctly identified
+    f2CorrectArea += f2Avg * segmentArea;
+  }
+} else {
+  // If in erasure region, add to erasure area
+  f1ErasureArea += f1Avg * segmentArea;
+  f2ErasureArea += f2Avg * segmentArea;
 }
-
-// METRIC TYPE A: Bitflip components as proportion of total bitflip probability
-// This shows how much each color contributes to the total error
+}
 totalBitflip = f1Error + f2Error;
-bitflipBlueComponentOfTotal = f1Error / totalMass;
-bitflipRedComponentOfTotal = f2Error / totalMass;
-
-// METRIC TYPE B: Bitflip as proportion of each signal
-// This shows what percentage of each signal is misclassified
-bitflipBlueComponentOfBlue = f1Error / totalF1Mass;
-bitflipRedComponentOfRed = f2Error / totalF2Mass;
-
-
-// METRIC TYPE C: Erasure components as proportion of total erasure
 totalErasure = f1ErasureArea + f2ErasureArea;
-erasureBlueComponentOfTotal = f1ErasureArea / totalMass;
-erasureRedComponentOfTotal = f2ErasureArea / totalMass;
 
-// METRIC TYPE D: Erasure as proportion of each signal
-erasureBlueComponentOfBlue = f1ErasureArea / totalF1Mass;
-erasureRedComponentOfRed = f2ErasureArea / totalF2Mass;
-errorProbability = (f1Error + f2Error) / totalMass;
-erasureProbability = (f1ErasureArea + f2ErasureArea) / totalMass;
+// FIXED: Global proportions correctly normalized by their own totals
+// a1 & a2: What fraction of total bit flips come from each signal
+bitflipBlueComponentOfTotal = totalBitflip > 0 ? f1Error / totalBitflip : 0;  // a1
+bitflipRedComponentOfTotal = totalBitflip > 0 ? f2Error / totalBitflip : 0;   // a2
+
+// b1 & b2: What percentage of each signal is misclassified
+bitflipBlueComponentOfBlue = totalF1Mass > 0 ? f1Error / totalF1Mass : 0;    // b1
+bitflipRedComponentOfRed = totalF2Mass > 0 ? f2Error / totalF2Mass : 0;     // b2
+
+// FIXED: Global erasure proportions correctly normalized
+// c1 & c2: What fraction of total erasures come from each signal
+erasureBlueComponentOfTotal = totalErasure > 0 ? f1ErasureArea / totalErasure : 0;  // c1
+erasureRedComponentOfTotal = totalErasure > 0 ? f2ErasureArea / totalErasure : 0;   // c2
+
+// d1 & d2: What percentage of each signal is erased
+erasureBlueComponentOfBlue = totalF1Mass > 0 ? f1ErasureArea / totalF1Mass : 0;    // d1
+erasureRedComponentOfRed = totalF2Mass > 0 ? f2ErasureArea / totalF2Mass : 0;     // d2
+
+// Calculate total probabilities
+errorProbability = totalMass > 0 ? totalBitflip / totalMass : 0;
+erasureProbability = totalMass > 0 ? totalErasure / totalMass : 0;
 correctProbability = 1 - errorProbability - erasureProbability;
 
-// Assign individual components for visualization
+// Assign values for BEC visualization
 bitflipBlueComponent = bitflipBlueComponentOfBlue;
 bitflipRedComponent = bitflipRedComponentOfRed;
 erasureBlueComponent = erasureBlueComponentOfBlue;
 erasureRedComponent = erasureRedComponentOfRed;
-correctBECBlue = f1CorrectArea / totalF1Mass;
-correctBECRed = f2CorrectArea / totalF2Mass;
+correctBECBlue = totalF1Mass > 0 ? f1CorrectArea / totalF1Mass : 0;
+correctBECRed = totalF2Mass > 0 ? f2CorrectArea / totalF2Mass : 0;
 
 
 
@@ -814,6 +815,10 @@ correctBECRed = f2CorrectArea / totalF2Mass;
         size: 12
       },
       legend: {
+        font: {
+          size: Math.max(4, window.innerWidth * 0.01) // 👈 scales with vw
+        },
+        tracegroupgap: 5,
         bgcolor: 'rgba(255, 255, 255, 0.1)',
         bordercolor: 'rgba(255, 255, 255, 0.2)',
         borderwidth: 1
@@ -1110,7 +1115,7 @@ correctBECRed = f2CorrectArea / totalF2Mass;
 </div>
 {/if}
 
-    </div>
+</div>
   
     <!-- Wrap the two plots in a flex container -->
 <div class="plots-wrapper" style="display: flex; gap: 20px; align-items: flex-start;">
@@ -1120,7 +1125,7 @@ correctBECRed = f2CorrectArea / totalF2Mass;
   <!-- New BEC container -->
   <div class="bec-container" 
        style="width: {scaleBEC ? '400px' : '1px'}; height: {scaleBEC ? '400px' : '1px'};">
-    <!-- Insert your BEC SVG here (or call a function to render it) -->
+
     <svg viewBox="0 0 270 160" preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="becGradient" x1="0" y1="0" x2="250" y2="0" gradientUnits="userSpaceOnUse">
@@ -1235,9 +1240,9 @@ correctBECRed = f2CorrectArea / totalF2Mass;
       
       <!-- Show error and erasure probabilities for modes with thresholds -->
       {#if overlapMode === "left" || overlapMode === "right"}
-      <h1>Classification Probabilities</h1>  
+      <h1>Classification Probabilities </h1>  
       <h2>
-        Total Bit Flip Probability: 
+        Total Joint Bit Flip Probability: 
         <span class="gradient-text error">{errorProbability.toFixed(2)}</span>  
       </h2>
       <div class="component-row">
@@ -1249,7 +1254,7 @@ correctBECRed = f2CorrectArea / totalF2Mass;
         <span class="component-block blue-component">Incorrect Amount of Blue Out of Total Blue Signal: {bitflipBlueComponentOfBlue.toFixed(2)}</span>
         <span class="component-block red-component">Incorrect Amount of Red Out of Total Red Signal: {bitflipRedComponentOfRed.toFixed(2)}</span>
       </div>
-      <h2>Total Erasure Probability: <span class="gradient-text erasure">{erasureProbability.toFixed(2)}</span>
+      <h2>Total Joint Erasure Probability: <span class="gradient-text erasure">{erasureProbability.toFixed(2)}</span>
       </h2>
       <div class="component-row">
         <span class="component-block greenblue-component">Blue Constituent of Total Erasure Probability: {erasureBlueComponentOfTotal.toFixed(2)}</span>
@@ -1296,13 +1301,13 @@ correctBECRed = f2CorrectArea / totalF2Mass;
           <p class="color-key"><span class="color-chip gold"></span> <strong>Gold fill: </strong> &nbsp;Total area where both curves overlap. Total bit flip area</p>
         {:else if overlapMode === "left"}
           <p><strong>Bit Flip Probability (Pe):</strong> P<sub>e</sub> = ∫<sub>τ</sub><sup>∞</sup> f<sub>1</sub>(x) dx + ∫<sub>-∞</sub><sup>-τ</sup> f<sub>2</sub>(x) dx</p>
-          <p><strong>Erasure Probability (Pc):</strong> P<sub>c</sub> = ∫<sub>-τ</sub><sup>τ</sup> f<sub>1</sub>(x) dx + ∫<sub>-τ</sub><sup>τ</sup> f<sub>2</sub>(x) dx</p>
+          <p><strong>Erasure Probability (Pc):</strong> P<sub>c</sub> = ∫<sub>-τ</sub><sup>τ</sup> f<sub>1</sub>(x) dx + ∫<sub>-τ</sub><sup>τ</sup> f<sub>2</sub>(x) dx</p> <br>
           <p class="color-key"><span class="color-chip blue"></span> Blue fill: &nbsp; Overlap area where Signal -1 is not affected by erasure and bit flip occurs</p>
           <p class="color-key"><span class="color-chip red"></span> Red fill: &nbsp; Overlap area where Signal 1 is not affected by erasure and bit flip occurs</p>
           <p class="color-key"><span class="color-chip green"></span> Green fill: &nbsp; Erasure region left of τ & right of -τ</p>
         {:else}
           <p><strong>Bit Flip Probability (Pe):</strong> P<sub>e</sub> = ∫<sub>τ</sub><sup>∞</sup> f<sub>1</sub>(x) dx + ∫<sub>-∞</sub><sup>-τ</sup> f<sub>2</sub>(x) dx</p>
-          <p><strong>Erasure Probability (Pc):</strong> P<sub>c</sub> = ∫<sub>-τ</sub><sup>τ</sup> f<sub>1</sub>(x) dx + ∫<sub>-τ</sub><sup>τ</sup> f<sub>2</sub>(x) dx</p>
+          <p><strong>Erasure Probability (Pc):</strong> P<sub>c</sub> = ∫<sub>-τ</sub><sup>τ</sup> f<sub>1</sub>(x) dx + ∫<sub>-τ</sub><sup>τ</sup> f<sub>2</sub>(x) dx</p> <br>
           <p class="color-key"><span class="color-chip blue"></span> <strong> Blue fill: &nbsp;  </strong> Overlap area where Signal -1 is not affected by erasure and bit flip occurs</p>
           <p class="color-key"><span class="color-chip red"></span> <strong>Red fill: &nbsp; </strong> Overlap area where Signal 1 is not affected by erasure and bit flip occurs</p>
           <p class="color-key"><span class="color-chip green"></span> <strong> Green fill: &nbsp; </strong> Erasure region right of τ & left of -τ</p>
